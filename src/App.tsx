@@ -60,6 +60,7 @@ import type { Asset, Order, OrderInput } from "./types";
 import AccountMenu from "./AccountMenu";
 import Dialog from "./Dialog";
 import ReplayWorkspace from "./Replay";
+import ReplayComparison from "./ReplayComparison";
 import { navigate } from "./navigation";
 import { PortfolioHistory, OrderLearning, PrivateNews } from "./Insights";
 
@@ -1493,9 +1494,11 @@ function ServiceLoading() {
 export default function App({
   replayId,
   initialView,
+  replayComparison = false,
 }: {
   replayId?: string;
   initialView?: "replay";
+  replayComparison?: boolean;
 }) {
   const dispatch = useAppDispatch();
   const { symbol, view, market, account, accountError, marketError } =
@@ -1608,11 +1611,15 @@ export default function App({
           )}
           {view === "replay" ? (
             account ? (
-              <ReplayWorkspace
-                key={account.id}
-                accountId={account.id}
-                sessionId={replayId}
-              />
+              replayComparison ? (
+                <ReplayComparison key={account.id} accountId={account.id} />
+              ) : (
+                <ReplayWorkspace
+                  key={account.id}
+                  accountId={account.id}
+                  sessionId={replayId}
+                />
+              )
             ) : (
               <ServiceLoading />
             )

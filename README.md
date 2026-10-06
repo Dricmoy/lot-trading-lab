@@ -8,6 +8,8 @@ Practice making trading decisions with virtual money. Choose a synthetic market 
 
 **[Try Lot Replay without signup](https://lot-trading-lab.vercel.app/replay)** · [Live app](https://lot-trading-lab.vercel.app) · [Regular workspace](https://lot-trading-lab.vercel.app/demo)
 
+**[Explore the example decision tree](https://lot-trading-lab.vercel.app/replay/compare?example=1)** · [Compare your completed attempts](https://lot-trading-lab.vercel.app/replay/compare)
+
 ## Watch the demo
 
 [![Watch the recorded Lot product demo](public/demo/lot-walkthrough-polished.jpg)](https://lot-trading-lab.vercel.app/#watch-demo)
@@ -31,6 +33,7 @@ The demo records actual guest buy/sell trades, portfolio updates, and completed 
 - Replay a steady climb, sudden selloff, or volatile opening; only revealed prices and fictional dispatches reach the browser.
 - Play/pause, change speed, advance moments, finish early, and retry the same path with a fresh independent $100,000 balance.
 - Record a reason before replay trades, save reflections, and compare net return, drawdown, realized/unrealized gains, and fees against holding.
+- Compare two completed attempts on the same scenario in an interactive decision tree: shared choices form a trunk, then branches show different orders, cancellations and finishes. Inspect plans/fills/reflections and compare results at the same revealed clock.
 - Select light, standard, or challenging modeled spread, latency cost, and fees.
 - Explicitly share finished recaps; journal notes remain private by default, and links can be revoked.
 - Keep ordinary limit orders open with reserved cash/shares, cancel remainders, or choose immediate-or-cancel.
@@ -124,6 +127,8 @@ Local password-reset messages are saved to the gitignored `.mailbox/` directory.
 | `/api/orders/journal` | POST | Save an owned order reflection |
 | `/api/portfolio/history?days=7` | GET | Observed values and holding comparison; windows 1, 7, or 30 days |
 | `/api/replay` | GET/POST | Scenario catalog/saved sessions; start an independent replay |
+| `/api/replay/compare?first=<id>&second=<id>` | GET | Owned finished attempts, reconstructed decision branches and outcomes at a common clock |
+| `/api/replay/compare/example` | GET | Authored synthetic example executed entirely in memory; no saved user data |
 | `/api/replay/<id>` | GET/POST | Restore/advance/trade/reflect/finish/share/revoke an owned replay |
 | `/api/replay/shared/<token>` | GET | Deliberately shared finished recap; notes excluded by default |
 | `/api/news?symbol=HOOD` | GET | Owner-only attributed Alpaca headlines |
@@ -144,6 +149,8 @@ Account mutations require a valid registered session, guest cookie, or owner ses
 `transaction.atomic()` and `select_for_update()` serialize each PostgreSQL account's order/reset operations. The matching response, cash update, position cost basis, order, and cash-ledger entry form one transaction. Unique database constraints enforce per-account idempotency. Monetary values use integer cents throughout. Selling releases proportional cost basis using integer rounding; selling the entire position removes its complete remaining cost.
 
 Replay actions lock their session, require a current revision and a UUID request key, and persist a payload fingerprint plus an event. The read-only reconciliation command reconstructs replay state from those events and checks ordinary cash anchors, movement chains, fill totals, and reservations. A stale version or conflicting retry returns 409. Sharing is explicit, notes are excluded by default, and revoked links return 404.
+
+[Attempt comparison](docs/ATTEMPT_COMPARISON.md) reuses saved events to reconstruct each decision's actual before/after state. It requires distinct, owned, completed attempts on the same scenario version. Shared order terms/timing form the tree's trunk; plans can differ. Charts and measurements stop at the last moment both attempts experienced; individual branches retain their own full endings. Different execution conditions are disclosed. The tree describes recorded choices and outcomes, without claiming that one choice alone caused a result. Private plans and reflections stay in the account workspace.
 
 The Go engine heapifies a synthetic book in O(n), then takes the best price and earliest sequence for each fill in O(log n). Total matching cost is O(n + k log n), where n is depth and k is fills. Limits protect execution prices; Go computes an immediate execution slice. Django keeps `gtc` limit remainders open and reserves their cash/shares; `ioc` remainders cancel. Ordinary resting orders are checked while the regular workspace is open, at most one eligible order per quote observation. Each order is checked at most once per 15-second bucket. This is request-driven evaluation, not a continuously running exchange. Replay limits are evaluated at each revealed moment and expire when the session ends. A buy that exceeds available cash at execution is rejected atomically. Network retries can safely reuse their key.
 

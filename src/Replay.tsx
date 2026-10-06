@@ -16,6 +16,7 @@ import {
   Check,
   Copy,
   FastForward,
+  GitBranch,
   LoaderCircle,
   Pause,
   Play,
@@ -28,7 +29,7 @@ import { navigate } from "./navigation";
 import Dialog from "./Dialog";
 import "./replay.css";
 
-type ReplayOrder = {
+export type ReplayOrder = {
   id: string;
   side: "buy" | "sell";
   kind: "market" | "limit";
@@ -99,7 +100,7 @@ export type ReplaySession = {
   share_url: string | null;
   notes_shared: boolean;
 };
-type Catalog = {
+export type Catalog = {
   scenarios: {
     id: string;
     title: string;
@@ -110,6 +111,9 @@ type Catalog = {
   }[];
   sessions: {
     id: string;
+    scenario: string;
+    scenario_version: number;
+    friction: string;
     title: string;
     step: number;
     finished: boolean;
@@ -730,7 +734,15 @@ export default function ReplayWorkspace({
           stay separate from your regular portfolio.
         </p>
         <section className="replay-saved">
-          <h2>Your saved sessions.</h2>
+          <div className="replay-section-heading">
+            <h2>Your saved sessions.</h2>
+            <button
+              className="replay-text-button"
+              onClick={() => navigate("/replay/compare")}
+            >
+              <GitBranch size={17} /> Compare attempts
+            </button>
+          </div>
           {catalog?.sessions.length ? (
             catalog.sessions.slice(0, visibleSessions).map((s) => (
               <button
@@ -1076,6 +1088,24 @@ export default function ReplayWorkspace({
         </div>
       )}
       <Performance session={session} />
+      {session.finished && (
+        <div className="replay-compare-invitation">
+          <GitBranch size={24} />
+          <div>
+            <h3>Where did your choices lead?</h3>
+            <p>
+              Compare two attempts on the same path. Follow the decisions where
+              they split.
+            </p>
+          </div>
+          <button
+            className="replay-text-button"
+            onClick={() => navigate(`/replay/compare?first=${session.id}`)}
+          >
+            Compare this attempt <ArrowRight size={16} />
+          </button>
+        </div>
+      )}
       {session.finished && (
         <section className="replay-next">
           <div>

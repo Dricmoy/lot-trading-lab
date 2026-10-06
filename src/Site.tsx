@@ -1039,11 +1039,20 @@ export default function Site() {
     );
   if (/^\/s\/[0-9a-f-]{36}$/.test(path))
     return <SharedReplay token={path.slice(3)} />;
-  if (path === "/replay" || /^\/replay\/[0-9a-f-]{36}$/.test(path))
+  if (
+    path === "/replay" ||
+    path === "/replay/compare" ||
+    /^\/replay\/[0-9a-f-]{36}$/.test(path)
+  )
     return (
       <App
         initialView="replay"
-        replayId={path === "/replay" ? undefined : path.slice(8)}
+        replayId={
+          path === "/replay" || path === "/replay/compare"
+            ? undefined
+            : path.slice(8)
+        }
+        replayComparison={path === "/replay/compare"}
       />
     );
   if (path === "/app" || path === "/demo")

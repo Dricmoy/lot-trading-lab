@@ -4,6 +4,8 @@ import json
 import math
 import uuid
 from copy import deepcopy
+from datetime import datetime, timezone
+from types import SimpleNamespace
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -303,8 +305,8 @@ def collection(request):
     if request.method == "GET":
         catalog = [{"id": key, **{k: v for k, v in item.items() if k != "news"}} for key, item in CATALOG.items()]
         # Select small JSON scalars rather than loading every journal/history blob.
-        rows = account.replays.order_by("-created_at").values("id", "scenario", "created_at", "state__step", "state__finished", "state__cash", "state__shares")[:200]
-        sessions = [{"id": str(s["id"]), "scenario": s["scenario"], "title": CATALOG[s["scenario"]]["title"], "step": s["state__step"],
+        rows = account.replays.order_by("-created_at").values("id", "scenario", "scenario_version", "created_at", "state__friction", "state__step", "state__finished", "state__cash", "state__shares")[:200]
+        sessions = [{"id": str(s["id"]), "scenario": s["scenario"], "scenario_version": s["scenario_version"], "friction": s["state__friction"], "title": CATALOG[s["scenario"]]["title"], "step": s["state__step"],
                      "finished": s["state__finished"], "return": (s["state__cash"] + s["state__shares"] * prices(s["scenario"])[s["state__step"]] - STARTING_CASH) / STARTING_CASH * 100,
                      "created_at": s["created_at"].isoformat()} for s in rows]
         return reply({"scenarios": catalog, "sessions": sessions, "friction": FRICTION})
@@ -365,6 +367,130 @@ def detail(request, session_id):
         return reply({"error": "This session was not found in your workspace."}, 404)
     except OrderError as exc:
         return reply({"error": str(exc)}, exc.status)
+
+
+@require_GET
+def compare(request):
+    account = resolve_account(request)
+    if not account:
+        return reply({"error": "Open a practice workspace first."}, 401)
+    try:
+        first, second = (uuid.UUID(request.GET.get(name, "")) for name in ("first", "second"))
+    except (ValueError, AttributeError):
+        return reply({"error": "Choose two completed attempts to compare."}, 400)
+    if first == second:
+        return reply({"error": "Choose two different attempts."}, 400)
+    with transaction.atomic():
+        # Use the same locks as reflection edits; acquire them in a stable order.
+        sessions = list(account.replays.select_for_update().filter(id__in=[first, second]).order_by("id"))
+        if len(sessions) != 2:
+            return reply({"error": "An attempt was not found in your workspace."}, 404)
+        by_id = {s.id: s for s in sessions}
+        a, b = by_id[first], by_id[second]
+        if not a.state["finished"] or not b.state["finished"]:
+            return reply({"error": "Finish both attempts before comparing their decisions."}, 409)
+        if (a.scenario, a.scenario_version) != (b.scenario, b.scenario_version):
+            return reply({"error": "Choose attempts from the same scenario and version."}, 400)
+        if a.scenario_version != 1:
+            return reply({"error": "Comparison is unavailable for this scenario version."}, 409)
+        cutoff = min(a.state["step"], b.state["step"])
+        try:
+            attempts = [comparison_trace(s, cutoff) for s in (a, b)]
+        except (ValueError, OrderError):
+            return reply({"error": "These saved decisions could not be reconstructed. Open the individual recaps instead."}, 409)
+    shared = 0
+    for left, right in zip(attempts[0]["decisions"], attempts[1]["decisions"]):
+        if left["choice"] != right["choice"]:
+            break
+        shared += 1
+    for attempt in attempts:
+        for decision in attempt["decisions"]:
+            decision.pop("choice")
+    return reply({"scenario": a.scenario, "title": CATALOG[a.scenario]["title"], "cutoff": cutoff,
+                  "clock": clock(cutoff), "shared_decisions": shared, "attempts": attempts,
+                  "different_conditions": a.state["friction"] != b.state["friction"]})
+
+
+def comparison_trace(session, cutoff, events=None):
+    """Fold saved events into actual decision snapshots and a common-time result."""
+    state = initial_state(session.scenario, session.state["friction"])
+    comparable = deepcopy(state)
+    decisions = []
+    final_orders = {o["id"]: o for o in session.state["orders"]}
+    path = prices(session.scenario)
+    for event in events if events is not None else session.events.order_by("created_at", "id"):
+        data = event.payload
+        if event.fingerprint != fingerprint(data) or data.get("revision") != state["revision"]:
+            raise ValueError("Replay action fingerprint or revision differs.")
+        before = deepcopy(state)
+        apply(state, data, session.scenario, uuid.uuid5(session.id, str(event.key)))
+        if state["step"] <= cutoff:
+            comparable = deepcopy(state)
+        elif before["step"] < cutoff and data["action"] == "advance":
+            comparable = before
+            apply(comparable, {"action": "advance", "count": cutoff - before["step"]}, session.scenario)
+        action = data["action"]
+        if action not in ("order", "cancel", "finish"):
+            continue
+        order = state["orders"][-1] if action == "order" else next((o for o in state["orders"] if o["id"] == data.get("order_id")), None)
+        choice = {"action": action, "step": before["step"]}
+        if action == "order":
+            choice.update({k: order[k] for k in ("side", "kind", "requested", "limit")})
+        elif action == "cancel":
+            choice["order_index"] = next(i for i, o in enumerate(state["orders"]) if o["id"] == order["id"])
+        decisions.append({"id": str(event.id), "action": action, "step": before["step"], "time": clock(before["step"]),
+                          "price": path[before["step"]], "before_value": metrics(before, path)["value"],
+                          "value": metrics(state, path)["value"], "cash": state["cash"], "shares": state["shares"],
+                          "order": deepcopy(order), "reflection": final_orders[order["id"]]["reflection"] if order else "",
+                          "final_order": deepcopy(final_orders[order["id"]]) if order else None, "choice": choice})
+    if state != session.state:
+        raise ValueError("Replay reconstruction differs from saved state.")
+    # Keep the final observation at each moment, including all decisions at that clock.
+    history = {p["step"]: p for p in comparable["history"]}
+    return {"id": str(session.id), "created_at": session.created_at.isoformat(), "clock": clock(state["step"]),
+            "step": state["step"], "friction": state["friction"], "metrics": metrics(state, path), "decisions": decisions,
+            "common": {"metrics": metrics(comparable, path), "cash": comparable["cash"], "shares": comparable["shares"],
+                       "history": [history[step] for step in sorted(history)]}}
+
+
+@require_GET
+def comparison_example(request):
+    """Authored synthetic choices, executed in memory; no saved accounts or notes."""
+    attempts = []
+    scripts = [
+        [(0, "buy", "market", 50, 0, "Start small while the outlook is unchanged."),
+         (14, "buy", "market", 150, 0, "Add to the position after the opening rise."),
+         (19, "buy", "limit", 50, 10120, "Add only if the price returns to my entry."),
+         (26, "sell", "market", 100, 0, "Reduce exposure after the revised outlook.")],
+        [(0, "buy", "market", 50, 0, "Start small and reassess as new information arrives."),
+         (14, "sell", "market", 30, 0, "Reduce the position before the next update."),
+         (20, "sell", "market", 20, 0, "Exit the remaining position after guidance changes.")],
+    ]
+    for index, script in enumerate(scripts):
+        session_id = uuid.uuid5(uuid.NAMESPACE_URL, f"lot-scripted-comparison-{index}")
+        state = initial_state("sudden-selloff", "standard")
+        events = []
+
+        def record(data):
+            data = {**data, "revision": state["revision"]}
+            key = uuid.uuid5(session_id, str(len(events)))
+            events.append(SimpleNamespace(id=f"example-{index}-{len(events)}", key=key, payload=data, fingerprint=fingerprint(data)))
+            apply(state, data, "sudden-selloff", uuid.uuid5(session_id, str(key)))
+
+        for step, side, kind, quantity, limit, reason in script:
+            while state["step"] < step:
+                record({"action": "advance", "count": min(5, step - state["step"])})
+            record({"action": "order", "side": side, "kind": kind, "quantity": quantity, "limit": limit, "reason": reason})
+        while state["step"] < LAST_STEP:
+            record({"action": "advance", "count": min(5, LAST_STEP - state["step"])})
+        session = SimpleNamespace(id=session_id, scenario="sudden-selloff", state=state, created_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+        attempts.append(comparison_trace(session, LAST_STEP, events))
+    for attempt in attempts:
+        for decision in attempt["decisions"]:
+            decision.pop("choice")
+    return reply({"example": True, "scenario": "sudden-selloff", "title": CATALOG["sudden-selloff"]["title"],
+                  "cutoff": LAST_STEP, "clock": clock(LAST_STEP), "shared_decisions": 1,
+                  "different_conditions": False, "attempts": attempts})
 
 
 @require_GET

@@ -6,6 +6,8 @@ from backend.trading import news
 
 urlpatterns = [
     path("api/replay", replay.collection),
+    path("api/replay/compare", replay.compare),
+    path("api/replay/compare/example", replay.comparison_example),
     path("api/replay/<uuid:session_id>", replay.detail),
     path("api/replay/shared/<uuid:token>", replay.shared),
     path("api/learning-metrics", replay.learning_metrics),
