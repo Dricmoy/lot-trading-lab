@@ -18,9 +18,15 @@ from .services import OrderError, create_account, place_order
 
 
 def resolve_account(request):
+    private_id = request.session.get("lot_private_account")
+    if private_id and owner_id() and private_id == str(owner_id()):
+        return Account.objects.filter(id=private_id).first()
+    if request.user.is_authenticated:
+        current, _ = Account.objects.get_or_create(user=request.user)
+        return current
     try:
         account_id = signing.loads(request.COOKIES.get("lot_account", ""), salt="lot-account", max_age=60 * 60 * 24 * 30)
-        return Account.objects.get(id=account_id)
+        return Account.objects.get(id=account_id, user__isnull=True)
     except (signing.BadSignature, Account.DoesNotExist, ValueError):
         return None
 
@@ -44,6 +50,7 @@ def serialize_account(account):
     return {
         "id": str(account.id),
         "cash": account.cash,
+        "watchlist": account.watchlist,
         "market_source": "alpaca-iex" if is_owner(account) else "simulated",
         "positions": list(account.positions.filter(quantity__gt=0).values("symbol", "quantity", "cost")),
         "orders": [serialize_order(order) for order in account.orders.all()[:50]],
@@ -82,7 +89,7 @@ def account_response(current):
 def orders(request):
     current = resolve_account(request)
     if not current:
-        return JsonResponse({"error": "Start a demo account first."}, status=401)
+        return JsonResponse({"error": "Open a practice account to continue."}, status=401)
     try:
         data = json.loads(request.body)
         order, replayed = place_order(current.id, data, request.headers.get("Idempotency-Key"))
@@ -100,7 +107,7 @@ def orders(request):
 def reset(request):
     current = resolve_account(request)
     if not current:
-        return JsonResponse({"error": "Start a demo account first."}, status=401)
+        return JsonResponse({"error": "Open a practice account to continue."}, status=401)
     with transaction.atomic():
         current = Account.objects.select_for_update().get(id=current.id)
         current.orders.all().delete()
@@ -108,6 +115,23 @@ def reset(request):
         current.cash = 10000000
         current.save(update_fields=["cash"])
     return JsonResponse(serialize_account(current))
+
+
+@require_POST
+def preferences(request):
+    current = resolve_account(request)
+    if not current:
+        return JsonResponse({"error": "Open a practice account first."}, status=401)
+    try:
+        data = json.loads(request.body)
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "Invalid request."}, status=400)
+    watchlist = data.get("watchlist") if isinstance(data, dict) else None
+    if not isinstance(watchlist, list) or len(watchlist) > len(SYMBOLS) or any(not isinstance(s, str) or s not in SYMBOLS for s in watchlist):
+        return JsonResponse({"error": "Choose supported stocks for your watchlist."}, status=400)
+    current.watchlist = list(dict.fromkeys(watchlist))
+    current.save(update_fields=["watchlist"])
+    return JsonResponse({"watchlist": current.watchlist})
 
 
 @require_POST
@@ -120,6 +144,7 @@ def connect(request):
     if not owner_id() or not isinstance(token, str) or not secrets.compare_digest(token, settings.LOT_OWNER_ACCESS_TOKEN):
         return JsonResponse({"error": "Private access token is invalid."}, status=403)
     current, _ = Account.objects.get_or_create(id=owner_id(), defaults={"cash": 10000000})
+    request.session["lot_private_account"] = str(current.id)
     return account_response(current)
 
 

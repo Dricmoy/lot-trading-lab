@@ -1,11 +1,14 @@
 import uuid
 from django.db import models
+from django.conf import settings
 
 
 class Account(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     cash = models.BigIntegerField(default=10000000)
     created_at = models.DateTimeField(auto_now_add=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name="trading_account")
+    watchlist = models.JSONField(default=list)
 
     class Meta:
         constraints = [models.CheckConstraint(condition=models.Q(cash__gte=0), name="nonnegative_cash")]
@@ -47,3 +50,9 @@ class LedgerEntry(models.Model):
     cash_delta = models.BigIntegerField()
     cash_after = models.BigIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AuthThrottle(models.Model):
+    key = models.CharField(max_length=64, primary_key=True)
+    attempts = models.PositiveIntegerField(default=0)
+    started_at = models.DateTimeField()

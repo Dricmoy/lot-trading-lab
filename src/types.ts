@@ -42,10 +42,12 @@ export type Order = {
 export type Account = {
   id: string;
   cash: number;
+  watchlist: string[];
   market_source?: string;
   positions: { symbol: string; quantity: number; cost: number }[];
   orders: Order[];
 };
+export type User = { name: string; email: string };
 export type OrderInput = {
   symbol: string;
   side: "buy" | "sell";

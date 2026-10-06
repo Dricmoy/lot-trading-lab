@@ -12,7 +12,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRight,
-  AudioLines,
   BarChart3,
   Check,
   CheckCheck,
@@ -27,7 +26,6 @@ import {
   Plus,
   Search,
   ShieldCheck,
-  Sparkles,
   Star,
   Wallet,
   X,
@@ -44,7 +42,7 @@ import {
   loadAccount,
   selectSymbol,
   setView,
-  toggleWatch,
+  saveWatchlist,
   submitOrder,
   resetAccount,
   connectPrivate,
@@ -58,6 +56,8 @@ import {
   chartHistory,
 } from "./lib";
 import type { Asset, Order, OrderInput } from "./types";
+import AccountMenu from "./AccountMenu";
+import Dialog from "./Dialog";
 
 const assetColors: Record<string, string> = {
   HOOD: "#c5f36a",
@@ -80,24 +80,12 @@ function AssetMark({
     <span
       className={`asset-mark ${small ? "small" : ""}`}
       style={{ background: assetColors[symbol] ?? "#eee" }}
+      aria-hidden="true"
     >
-      {symbol === "HOOD" ? (
-        <AudioLines size={small ? 16 : 24} />
-      ) : symbol === "AAPL" ? (
-        <span className="apple">a</span>
-      ) : symbol === "NVDA" ? (
-        <Layers3 size={small ? 16 : 23} />
-      ) : symbol === "TSLA" ? (
-        "T"
-      ) : symbol === "AMZN" ? (
-        "a"
-      ) : symbol === "GOOGL" ? (
-        "G"
-      ) : symbol === "COIN" ? (
-        "C"
-      ) : (
-        "M"
-      )}
+      <img
+        src={`/logos/${symbol}.${["MSFT", "AMZN"].includes(symbol) ? "ico" : "svg"}`}
+        alt=""
+      />
     </span>
   );
 }
@@ -133,7 +121,7 @@ function Sparkline({ asset }: { asset: Asset }) {
 
 function Sidebar() {
   const dispatch = useAppDispatch();
-  const { view } = useAppSelector((s) => s.trading);
+  const { view, user } = useAppSelector((s) => s.trading);
   return (
     <aside className="sidebar">
       <a className="brand" href="/" aria-label="Lot home">
@@ -143,7 +131,7 @@ function Sidebar() {
         </span>
         lot<span className="brand-period">.</span>
       </a>
-      <span className="workspace-label">YOUR WORKSPACE</span>
+      <span className="workspace-label">Your workspace</span>
       <nav aria-label="Main navigation">
         {(
           [
@@ -154,6 +142,8 @@ function Sidebar() {
         ).map(({ id, name, icon: Icon }) => (
           <button
             key={id}
+            aria-label={name}
+            aria-current={view === id ? "page" : undefined}
             className={`nav-link ${view === id ? "active" : ""}`}
             onClick={() => dispatch(setView(id))}
           >
@@ -165,24 +155,24 @@ function Sidebar() {
       </nav>
       <div className="sidebar-note">
         <div className="note-symbol">
-          <Sparkles size={22} />
+          <Wallet size={22} />
         </div>
         <h3>
-          Real practice.
+          Learn at your
           <br />
-          Zero real risk.
+          own pace.
         </h3>
-        <p>Build your confidence with $100,000 in virtual funds.</p>
+        <p>$100,000 in virtual cash. Every trade is practice.</p>
         <span>
           <ShieldCheck size={14} />
-          Always paper money
+          Virtual money only
         </span>
       </div>
       <div className="sidebar-bottom">
-        <div className="avatar">D</div>
+        <div className="avatar">{user?.name[0] || "G"}</div>
         <div>
-          <strong>Demo investor</strong>
-          <span>Personal workspace</span>
+          <strong>{user?.name || "Guest investor"}</strong>
+          <span>{user ? "Practice account" : "Guest workspace"}</span>
         </div>
         <ChevronDown size={15} />
       </div>
@@ -192,7 +182,7 @@ function Sidebar() {
 
 function Header() {
   const dispatch = useAppDispatch();
-  const { market, account, view } = useAppSelector((s) => s.trading);
+  const { market, view } = useAppSelector((s) => s.trading);
   const [search, setSearch] = useState("");
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -269,51 +259,16 @@ function Header() {
       <span className="paper-badge">
         <span /> Paper trading
       </span>
-      <div
-        className="top-avatar"
-        title={account ? "Your isolated demo account" : "Demo account"}
-      >
-        D
-      </div>
+      <AccountMenu />
     </header>
-  );
-}
-
-function MarketStrip() {
-  const { market, symbol } = useAppSelector((s) => s.trading);
-  const dispatch = useAppDispatch();
-  return (
-    <div className="market-strip">
-      {market?.assets.slice(0, 4).map((asset) => (
-        <button
-          key={asset.symbol}
-          className={symbol === asset.symbol ? "selected" : ""}
-          onClick={() => dispatch(selectSymbol(asset.symbol))}
-        >
-          <AssetMark small symbol={asset.symbol} />
-          <span>
-            <strong>{asset.symbol}</strong>
-            <small>{asset.name}</small>
-          </span>
-          <Sparkline asset={asset} />
-          <span className="strip-price">
-            <strong>{money(asset.price)}</strong>
-            <small className={change(asset) >= 0 ? "positive" : "negative"}>
-              {percent(change(asset))}
-            </small>
-          </span>
-        </button>
-      )) ??
-        Array.from({ length: 4 }, (_, i) => (
-          <div className="strip-skeleton skeleton" key={i} />
-        ))}
-    </div>
   );
 }
 
 function PriceChart({ asset }: { asset: Asset }) {
   const [range, setRange] = useState("1D");
   const [hover, setHover] = useState<number | null>(null);
+  const [watchPending, setWatchPending] = useState(false);
+  const [watchError, setWatchError] = useState("");
   const dispatch = useAppDispatch();
   const { watchlist } = useAppSelector((s) => s.trading);
   const real = !!asset.quote_time;
@@ -337,15 +292,31 @@ function PriceChart({ asset }: { asset: Asset }) {
         <div className="stock-identity">
           <AssetMark symbol={asset.symbol} />
           <div>
-            <h2>{asset.name}</h2>
-            <span>
-              {asset.symbol} <span className="dot-separator">·</span> NASDAQ
-            </span>
+            <h2>
+              {asset.symbol}
+              <span>{asset.name}</span>
+            </h2>
+            <span>NASDAQ</span>
           </div>
         </div>
         <button
           className={`watch-button ${watchlist.includes(asset.symbol) ? "watched" : ""}`}
-          onClick={() => dispatch(toggleWatch(asset.symbol))}
+          aria-pressed={watchlist.includes(asset.symbol)}
+          disabled={watchPending}
+          onClick={async () => {
+            setWatchPending(true);
+            setWatchError("");
+            const next = watchlist.includes(asset.symbol)
+              ? watchlist.filter((s) => s !== asset.symbol)
+              : [...watchlist, asset.symbol];
+            try {
+              await dispatch(saveWatchlist(next)).unwrap();
+            } catch {
+              setWatchError("Couldn't save your watchlist. Please try again.");
+            } finally {
+              setWatchPending(false);
+            }
+          }}
         >
           <Star
             size={15}
@@ -354,16 +325,40 @@ function PriceChart({ asset }: { asset: Asset }) {
           {watchlist.includes(asset.symbol) ? "Watching" : "Watch"}
         </button>
       </div>
-      <div className="price-block">
-        <h1>{money(price)}</h1>
-        <div className={delta >= 0 ? "positive" : "negative"}>
-          {delta >= 0 ? (
-            <ArrowUpRight size={17} />
-          ) : (
-            <ArrowDownLeft size={17} />
-          )}{" "}
-          {money(Math.abs(delta))} ({percent((delta / asset.previous) * 100)}){" "}
-          <span>{real ? "vs. previous IEX close" : "simulated today"}</span>
+      {watchError && (
+        <p className="inline-error" role="alert">
+          {watchError}
+        </p>
+      )}
+      <div className="quote-overview">
+        <div className="price-block">
+          <h1>{money(price)}</h1>
+          <div className={delta >= 0 ? "positive" : "negative"}>
+            {delta >= 0 ? (
+              <ArrowUpRight size={17} />
+            ) : (
+              <ArrowDownLeft size={17} />
+            )}{" "}
+            {money(Math.abs(delta))} ({percent((delta / asset.previous) * 100)}){" "}
+            <span>{real ? "vs. previous IEX close" : "simulated today"}</span>
+          </div>
+        </div>
+        <div className="stock-facts">
+          <div>
+            <span>Previous close</span>
+            <strong>{money(asset.previous)}</strong>
+          </div>
+          <div>
+            <span>{real ? "Chart close range" : "Day range"}</span>
+            <strong>
+              {money(Math.min(...asset.history))} –{" "}
+              {money(Math.max(...asset.history))}
+            </strong>
+          </div>
+          <div>
+            <span>Sector</span>
+            <strong>{asset.sector}</strong>
+          </div>
         </div>
       </div>
       {real && (
@@ -462,23 +457,6 @@ function PriceChart({ asset }: { asset: Asset }) {
         </span>
         <BarChart3 size={16} />
       </div>
-      <div className="stock-facts">
-        <div>
-          <span>Previous close</span>
-          <strong>{money(asset.previous)}</strong>
-        </div>
-        <div>
-          <span>{real ? "Chart close range" : "Day range"}</span>
-          <strong>
-            {money(Math.min(...asset.history))} –{" "}
-            {money(Math.max(...asset.history))}
-          </strong>
-        </div>
-        <div>
-          <span>Sector</span>
-          <strong>{asset.sector}</strong>
-        </div>
-      </div>
     </section>
   );
 }
@@ -552,7 +530,7 @@ function OrderTicket({ asset }: { asset: Asset }) {
           ? e.message
           : typeof e === "object" && e && "message" in e
             ? String(e.message)
-            : "Order failed. Retry with the same request key.",
+            : "Your order could not be placed. Try again.",
       );
     }
   }
@@ -560,7 +538,7 @@ function OrderTicket({ asset }: { asset: Asset }) {
     <section className="card order-card">
       <div className="ticket-title">
         <h2>Trade {asset.symbol}</h2>
-        <span className="muted-pill">SIMULATED</span>
+        <span className="muted-pill">Practice</span>
       </div>
       {confirmation ? (
         <div className="order-success">
@@ -577,7 +555,7 @@ function OrderTicket({ asset }: { asset: Asset }) {
           <p>
             {confirmation.executed
               ? `${confirmation.executed} ${confirmation.symbol} shares ${confirmation.side === "buy" ? "bought" : "sold"} for ${money(confirmation.total)}.`
-              : "No shares traded. Your limit did not cross the simulated spread."}
+              : "No shares traded at your limit price. Your balance is unchanged."}
           </p>
           <span>Unfilled shares are cancelled immediately.</span>
           <button
@@ -601,7 +579,7 @@ function OrderTicket({ asset }: { asset: Asset }) {
           <div className="review-heading">
             <ShieldCheck size={27} />
             <h3>One last look.</h3>
-            <p>Review your simulated order.</p>
+            <p>Check the details before you place your order.</p>
           </div>
           <dl className="order-summary">
             <div>
@@ -612,7 +590,7 @@ function OrderTicket({ asset }: { asset: Asset }) {
             </div>
             <div>
               <dt>Order type</dt>
-              <dd className="capitalize">{review.kind} · IOC</dd>
+              <dd className="capitalize">{review.kind}</dd>
             </div>
             <div>
               <dt>Shares</dt>
@@ -630,8 +608,8 @@ function OrderTicket({ asset }: { asset: Asset }) {
             </div>
           </dl>
           <p className="execution-note">
-            The final price depends on available simulated liquidity. Unfilled
-            shares are cancelled.
+            Your order fills at available practice prices. Any unfilled shares
+            are cancelled immediately.
           </p>
           {error && (
             <div className="inline-error" role="alert">
@@ -1132,45 +1110,43 @@ function Portfolio() {
             Clear your trades and start fresh with $100,000 in virtual cash.
           </p>
           <button className="text-button" onClick={() => setResetOpen(true)}>
-            Reset demo account <ArrowRight size={14} />
+            Reset practice account <ArrowRight size={14} />
           </button>
         </section>
       </div>
       {resetOpen && (
-        <div className="modal-backdrop">
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reset-title"
+        <Dialog
+          titleId="reset-title"
+          onClose={() => {
+            if (!resetting) setResetOpen(false);
+          }}
+        >
+          <button
+            className="modal-close icon-button"
+            aria-label="Close reset dialog"
+            disabled={resetting}
+            onClick={() => setResetOpen(false)}
           >
-            <button
-              className="modal-close icon-button"
-              aria-label="Close reset dialog"
-              disabled={resetting}
-              onClick={() => setResetOpen(false)}
-            >
-              <X size={20} />
-            </button>
-            <RotateCcw size={32} />
-            <h2 id="reset-title">Start with a clean slate?</h2>
-            <p>
-              This clears your simulated positions and order history, then
-              restores $100,000 in virtual cash.
-            </p>
-            {resetError && <p role="alert">{resetError}</p>}
-            <button className="primary" disabled={resetting} onClick={reset}>
-              {resetting ? "Resetting…" : "Reset my demo"}
-            </button>
-            <button
-              className="text-button full"
-              disabled={resetting}
-              onClick={() => setResetOpen(false)}
-            >
-              Keep my portfolio
-            </button>
-          </div>
-        </div>
+            <X size={20} />
+          </button>
+          <RotateCcw size={32} />
+          <h2 id="reset-title">Start with a clean slate?</h2>
+          <p>
+            This clears your simulated positions and order history, then
+            restores $100,000 in virtual cash.
+          </p>
+          {resetError && <p role="alert">{resetError}</p>}
+          <button className="primary" disabled={resetting} onClick={reset}>
+            {resetting ? "Resetting…" : "Reset practice account"}
+          </button>
+          <button
+            className="text-button full"
+            disabled={resetting}
+            onClick={() => setResetOpen(false)}
+          >
+            Keep my portfolio
+          </button>
+        </Dialog>
       )}
     </>
   );
@@ -1184,13 +1160,13 @@ function ExecutionDetails({ order }: { order: Order }) {
           {
             icon: ShieldCheck,
             title: "Validated",
-            detail: "Balance & position checks",
+            detail: "Cash and shares checked",
           },
-          { icon: Zap, title: "Matched", detail: "Go · price-time priority" },
+          { icon: Zap, title: "Matched", detail: "Filled at available prices" },
           {
             icon: Layers3,
             title: "Recorded",
-            detail: "Atomic ledger transaction",
+            detail: "Portfolio updated",
           },
         ].map(({ icon: Icon, title, detail }, i) => (
           <div key={title}>
@@ -1365,7 +1341,7 @@ function ActivityView() {
       ) : (
         <div className="empty-state">
           <Activity size={32} />
-          <h3>Your next move makes history.</h3>
+          <h3>Your trades will appear here.</h3>
           <p>
             {filter === "all"
               ? "Your trades and their execution details will appear here."
@@ -1380,8 +1356,8 @@ function ActivityView() {
         </div>
       )}
       <div className="activity-footnote">
-        Showing the latest 50 orders. Every execution is recorded in your demo
-        account’s ledger.
+        Your latest 50 orders. Export a copy of these trades whenever you need
+        it.
       </div>
     </section>
   );
@@ -1391,7 +1367,7 @@ function ServiceLoading() {
   return (
     <div className="loading-state">
       <LoaderCircle className="spin" size={25} />
-      <span>Getting your trading ground ready…</span>
+      <span>Loading your workspace…</span>
     </div>
   );
 }
@@ -1421,15 +1397,12 @@ export default function App() {
   const titles = {
     trade: [
       "Your trading ground.",
-      "Explore the market. Find your rhythm. Make your move.",
+      "Practice market and limit orders with virtual money.",
     ],
-    portfolio: [
-      "A little more perspective.",
-      "Your holdings, buying power, and progress in one place.",
-    ],
+    portfolio: ["Your portfolio.", "Your holdings, cash, and returns."],
     activity: [
-      "Every move, accounted for.",
-      "Your trades and the details behind every execution.",
+      "Your activity.",
+      "Review your orders and the shares that filled.",
     ],
   };
   return (
@@ -1440,7 +1413,6 @@ export default function App() {
         <main>
           <div className="page-heading">
             <div>
-              <div className="eyebrow">THE MARKET IS YOUR CLASSROOM</div>
               <h1>{titles[view][0]}</h1>
               <p>{titles[view][1]}</p>
             </div>
@@ -1452,13 +1424,13 @@ export default function App() {
                   : market
                     ? market.source === "alpaca-iex"
                       ? "Alpaca IEX connected"
-                      : "Simulation running"
+                      : "Practice market"
                     : "Connecting…"}
               </span>
               <small>
                 {market?.source === "alpaca-iex"
                   ? "Private data · Simulated fills · USD"
-                  : "Fictional prices · USD"}
+                  : "Simulated prices · USD"}
               </small>
               <button
                 className="private-access"
@@ -1484,7 +1456,6 @@ export default function App() {
           )}
           {view === "trade" ? (
             <>
-              <MarketStrip />
               <div className="trading-grid">
                 <div className="main-column">
                   {asset && asset.history.length > 0 ? (
@@ -1508,25 +1479,35 @@ export default function App() {
           )}
           <footer>
             <span>
-              <span className="footer-logo">lot.</span> A space to learn by
-              doing.
+              <span className="footer-logo">lot.</span> Practice trading. At
+              your own pace.
             </span>
             <span>
-              Independent project. Not affiliated with Robinhood.
+              Virtual money. Simulated trades.
+              <button
+                className="mobile-private-access"
+                onClick={() => setPrivateDialog(true)}
+              >
+                Private market data
+              </button>
               <button onClick={() => setHelp(true)}>
-                About this demo <ExternalLink size={11} />
+                About Lot <ExternalLink size={11} />
               </button>
             </span>
           </footer>
         </main>
       </div>
       {privateDialog && (
-        <div className="modal-backdrop">
+        <Dialog
+          titleId="private-title"
+          onClose={() => {
+            if (!connecting) {
+              setPrivateDialog(false);
+              setToken("");
+            }
+          }}
+        >
           <form
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="private-title"
             onSubmit={async (e) => {
               e.preventDefault();
               setConnecting(true);
@@ -1578,43 +1559,35 @@ export default function App() {
               {connecting ? "Connecting…" : "Connect private feed"}
             </button>
           </form>
-        </div>
+        </Dialog>
       )}
       {help && (
-        <div className="modal-backdrop">
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="about-title"
+        <Dialog titleId="about-title" onClose={() => setHelp(false)}>
+          <button
+            className="modal-close icon-button"
+            aria-label="Close about dialog"
+            onClick={() => setHelp(false)}
           >
-            <button
-              className="modal-close icon-button"
-              aria-label="Close about dialog"
-              onClick={() => setHelp(false)}
-            >
-              <X size={20} />
-            </button>
-            <span className="engineering-label">
-              <Sparkles size={17} /> WELCOME TO LOT
-            </span>
-            <h2 id="about-title">Practice makes perspective.</h2>
-            <p>
-              Lot is an independent engineering portfolio project inspired by
-              consumer investing products. It uses React, TypeScript, Redux,
-              Django, and Go.
-            </p>
-            <p>
-              Public demo prices are simulated. Private mode uses real Alpaca
-              IEX data, which covers one exchange rather than the whole market.
-              Liquidity, fills, and funds are always simulated. No real-money
-              trades are possible.
-            </p>
-            <button className="primary" onClick={() => setHelp(false)}>
-              Back to exploring <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
+            <X size={20} />
+          </button>
+          <span className="engineering-label">
+            <ShieldCheck size={17} /> Paper trading
+          </span>
+          <h2 id="about-title">Your practice account.</h2>
+          <p>
+            Lot is a place to practice buying and selling stocks. Use virtual
+            cash, try market and limit orders, and track your holdings.
+          </p>
+          <p>
+            Public demo prices are simulated. Private mode uses real Alpaca IEX
+            data, which covers one exchange rather than the whole market.
+            Liquidity, fills, and funds are always simulated. No real-money
+            trades are possible.
+          </p>
+          <button className="primary" onClick={() => setHelp(false)}>
+            Back to exploring <ArrowRight size={16} />
+          </button>
+        </Dialog>
       )}
     </div>
   );

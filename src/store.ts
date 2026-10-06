@@ -5,7 +5,7 @@ import {
 } from "@reduxjs/toolkit";
 import { useDispatch, useSelector } from "react-redux";
 import { api } from "./lib";
-import type { Account, Market, Order, OrderInput } from "./types";
+import type { Account, Market, Order, OrderInput, User } from "./types";
 
 export const loadMarket = createAsyncThunk(
   "trading/market",
@@ -39,6 +39,14 @@ export const connectPrivate = createAsyncThunk(
 export const resetAccount = createAsyncThunk("trading/reset", async () =>
   api<Account>("/api/reset", { method: "POST", body: "{}" }),
 );
+export const saveWatchlist = createAsyncThunk(
+  "trading/watchlist",
+  async (watchlist: string[]) =>
+    api<{ watchlist: string[] }>("/api/preferences", {
+      method: "POST",
+      body: JSON.stringify({ watchlist }),
+    }),
+);
 
 type State = {
   market: Market | null;
@@ -51,6 +59,12 @@ type State = {
   accountLoading: boolean;
   pending: boolean;
   marketRequest: string | null;
+  accountRequest: string | null;
+  orderRequest: string | null;
+  preferencesRequest: string | null;
+  resetRequest: string | null;
+  connectRequest: string | null;
+  user: User | null;
 };
 const initialState: State = {
   market: null,
@@ -63,11 +77,41 @@ const initialState: State = {
   accountLoading: false,
   pending: false,
   marketRequest: null,
+  accountRequest: null,
+  orderRequest: null,
+  preferencesRequest: null,
+  resetRequest: null,
+  connectRequest: null,
+  user: null,
 };
 const slice = createSlice({
   name: "trading",
   initialState,
   reducers: {
+    setSession(
+      state,
+      action: { payload: { user: User | null; account: Account | null } },
+    ) {
+      state.user = action.payload.user;
+      state.account = action.payload.account;
+      if (action.payload.account)
+        state.watchlist = action.payload.account.watchlist;
+      state.market = null;
+      state.marketError = null;
+      state.accountError = null;
+      state.marketRequest = null;
+      state.accountRequest = null;
+      state.orderRequest = null;
+      state.preferencesRequest = null;
+      state.resetRequest = null;
+      state.connectRequest = null;
+      state.accountLoading = false;
+      state.pending = false;
+      state.view = "trade";
+    },
+    clearSession() {
+      return { ...initialState };
+    },
     selectSymbol(state, action: { payload: string }) {
       state.symbol = action.payload;
       state.view = "trade";
@@ -96,40 +140,64 @@ const slice = createSlice({
         if (s.marketRequest === a.meta.requestId)
           s.marketError = a.error.message ?? "Market unavailable";
       })
-      .addCase(loadAccount.pending, (s) => {
+      .addCase(loadAccount.pending, (s, a) => {
         s.accountLoading = true;
+        s.accountRequest = a.meta.requestId;
       })
       .addCase(loadAccount.fulfilled, (s, a) => {
+        if (s.accountRequest !== a.meta.requestId) return;
         s.account = a.payload;
+        s.watchlist = a.payload.watchlist;
         s.accountError = null;
         s.accountLoading = false;
       })
       .addCase(loadAccount.rejected, (s, a) => {
+        if (s.accountRequest !== a.meta.requestId) return;
         s.accountError = a.error.message ?? "Account unavailable";
         s.accountLoading = false;
       })
-      .addCase(submitOrder.pending, (s) => {
+      .addCase(submitOrder.pending, (s, a) => {
         s.pending = true;
+        s.orderRequest = a.meta.requestId;
       })
       .addCase(submitOrder.fulfilled, (s, a) => {
+        if (s.orderRequest !== a.meta.requestId) return;
         s.pending = false;
         s.account = a.payload.account;
       })
-      .addCase(submitOrder.rejected, (s) => {
+      .addCase(submitOrder.rejected, (s, a) => {
+        if (s.orderRequest !== a.meta.requestId) return;
         s.pending = false;
       })
+      .addCase(connectPrivate.pending, (s, a) => {
+        s.connectRequest = a.meta.requestId;
+      })
       .addCase(connectPrivate.fulfilled, (s, a) => {
+        if (s.connectRequest !== a.meta.requestId) return;
         s.account = a.payload;
+        s.watchlist = a.payload.watchlist;
         s.market = null;
         s.marketRequest = null;
         s.marketError = null;
       })
+      .addCase(resetAccount.pending, (s, a) => {
+        s.resetRequest = a.meta.requestId;
+      })
       .addCase(resetAccount.fulfilled, (s, a) => {
+        if (s.resetRequest !== a.meta.requestId) return;
         s.account = a.payload;
+      })
+      .addCase(saveWatchlist.pending, (s, a) => {
+        s.preferencesRequest = a.meta.requestId;
+      })
+      .addCase(saveWatchlist.fulfilled, (s, a) => {
+        if (s.preferencesRequest !== a.meta.requestId) return;
+        s.watchlist = a.payload.watchlist;
       });
   },
 });
-export const { selectSymbol, setView, toggleWatch } = slice.actions;
+export const { selectSymbol, setView, toggleWatch, setSession, clearSession } =
+  slice.actions;
 export const store = configureStore({
   reducer: { trading: slice.reducer },
   devTools: import.meta.env.DEV,

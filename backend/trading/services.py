@@ -21,7 +21,7 @@ class OrderError(Exception):
 
 def create_account():
     with transaction.atomic():
-        account = Account.objects.create(cash=7552815)
+        account = Account.objects.create(cash=7552815, watchlist=["NVDA", "AAPL", "MSFT", "AMZN"])
         # A seeded, explicitly simulated portfolio with a $100,000 cost basis.
         for symbol, quantity, cost in [("HOOD", 80, 874400), ("NVDA", 60, 990000), ("AAPL", 25, 582785)]:
             Position.objects.create(account=account, symbol=symbol, quantity=quantity, cost=cost)
@@ -34,7 +34,7 @@ def execute(payload, account=None):
         with urlopen(request, timeout=25) as response:
             return json.load(response)
     except (HTTPError, URLError, TimeoutError, ValueError) as exc:
-        raise OrderError("The matching engine is unavailable. No funds were changed. Please retry.", 503) from exc
+        raise OrderError("Trading is temporarily unavailable. No funds were changed. Please try again.", 503) from exc
 
 
 def place_order(account_id, data, key):
@@ -71,7 +71,7 @@ def place_order(account_id, data, key):
         executed = sum(fill["quantity"] for fill in fills)
         total = sum(fill["quantity"] * fill["price"] for fill in fills)
         if executed != result.get("quantity") or total != result.get("total") or not 0 <= executed <= quantity or total < 0:
-            raise OrderError("Invalid execution response. No funds were changed.", 503)
+            raise OrderError("We couldn't complete this trade. No funds were changed. Please try again.", 503)
         if side == "buy" and total > account.cash:
             raise OrderError("Not enough buying power for this order.")
         delta = -total if side == "buy" else total

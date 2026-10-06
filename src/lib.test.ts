@@ -16,6 +16,7 @@ describe("Money and portfolio calculations", () => {
         {
           id: "test",
           cash: 500,
+          watchlist: [],
           orders: [],
           positions: [{ symbol: "X", quantity: 3, cost: 200 }],
         },

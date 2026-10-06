@@ -1,3 +1,97 @@
+# Published release — October 5, 2026
+
+Production: https://lot-trading-lab.vercel.app
+Deployment: `dpl_AQtVWsUb78iEdK8NXfpvXXb9Mo7G` (`https://lot-trading-i7pcg1i1n-dricmoys-projects.vercel.app`). Vercel reported READY and assigned the public production alias. Runtime build selected Python 3.12 from `.python-version`; Node 24 remains configured.
+
+## Approved release and data preservation
+
+The user explicitly approved publication and requested a recorded walkthrough plus no-signup demo access. Additive Django auth/content-types/session/trading migrations were applied before deployment. The migration helper compared ordered contents of all existing trading rows before and after: 18 accounts, 42 positions, two orders, and two ledger entries were preserved. Production signing/owner secrets were not exported. A migration-only ephemeral key was used locally; deployed cookie signing continues to use the existing production secret.
+
+## Live acceptance
+
+- `scripts/auth_smoke.py https://lot-trading-lab.vercel.app`: PASS. Fresh registered account, CSRF, actual Go quotes/fills, buy/sell cash and positions, replay safety, conflicting retry, cancelled limit, insufficient cash/shares, logout, restoration in another session, saved watchlist, identity isolation, password change, and reset of the separately created test account.
+- `scripts/smoke.py https://lot-trading-lab.vercel.app`: PASS. New isolated guest account, multi-level fills, buy/sell ledger, idempotency, conflicting/invalid requests, no shorting, cancelled limit, and isolated reset/persistence. Existing user accounts were never reset.
+- Browser: landing → Try the demo → `/demo`, with no registration or login form. Search selected Apple and review showed two shares and estimated cost. Portfolio and phone navigation worked. The existing guest account used for UI review was not traded or reset.
+- Public walkthrough playback: actual `paused=false`, `readyState=4`, 1440×1024 decoded video, duration 40.167 seconds. Poster, captions, accessible play overlay, transcript, native controls, and direct-video fallback are present.
+- Asset responses: MP4 200 `video/mp4`, 873,005 bytes; poster 200 `image/jpeg`; captions 200 `text/vtt`. A byte-range request returned 206 `bytes 0-31/873005`. `/demo`, `/signup`, and `/api/health` returned 200.
+- Public browser console error log after the review: empty.
+- New layout review: public landing/video and demo at 1280×720 and video at 1440×1024; phone video/portfolio at 390×844. Additional local video checks at 1440×1024 and 320×740. No page-level horizontal overflow in the inspected phone states.
+- Final extension checks: build/lint passed, nine frontend tests passed, 35 Django tests passed, Ruff passed, no missing migrations, and clean whitespace. Unchanged Go race/vet and dependency-audit evidence is recorded below.
+
+## Remaining configuration
+
+No production SMTP provider is configured. A live recovery request returned HTTP 503 with “Password recovery is temporarily unavailable. Please try again later.” Actual email delivery is not claimed. The provider question is pending the user; secure setup is documented in `docs/AUTHENTICATION.md`.
+
+## Recorded video provenance
+
+The 40-second walkthrough records the actual local running product and guest buy/sell/portfolio/history flow. It uses 355 browser-captured frames delivered as H.264, with gaps between recording sections removed, no audio, and descriptive captions. Source frames/manifest stay in the ignored `.sites-runtime/recording/`; publication includes only video, poster, captions, and provenance.
+
+---
+
+# Verification — October 5, 2026 redesign
+
+Scope: the local checkout at `/Users/dricmoybhattacharjee/Desktop/lot-trading-lab`, served by actual Vite, Django, and Go processes. This local evidence preceded the published release above. Older September public-deployment evidence below applies to the previous version only.
+
+## Final automated checks
+
+| Check | Result |
+| --- | --- |
+| `npm run build` | Passed: TypeScript and production Vite bundle |
+| `npm run lint` | Passed, no findings |
+| `npm test` | 9 tests passed across 2 files |
+| `.venv/bin/python manage.py test` | 35 tests passed; system checks clean |
+| `.venv/bin/ruff check .` | Passed |
+| `.venv/bin/python manage.py makemigrations --check --dry-run` | No missing migrations |
+| `go test -race ./api ./engine ./cmd/server` | API and engine suites passed; server has no test files |
+| `go vet ./api ./engine ./cmd/server` | Passed |
+| `npm audit` | Zero reported vulnerabilities, including development dependencies |
+| `git diff --check` | Passed |
+
+Authentication checks include hashed passwords, fresh cash accounts, CSRF, ownership despite copied cookies, guest promotion, restored holdings/history/watchlists, login throttling, password validation, password changes, revocation of other sessions, and one-use recovery tokens. Frontend state tests check that late account, order, market, preference, reset, and connection responses cannot repopulate an earlier identity after logout or account switching.
+
+## Integration against running services
+
+Commands:
+
+```sh
+.venv/bin/python scripts/auth_smoke.py http://127.0.0.1:5173
+.venv/bin/python scripts/smoke.py http://127.0.0.1:5173
+```
+
+Results:
+
+```text
+PASS: registered account, CSRF, real market API, buy/sell cash and positions,
+      safe retries, limits, insufficient cash/shares, logout, new-browser
+      restoration, saved watchlist, identity isolation, password change,
+      own-account reset
+PASS: health, Go quotes, account persistence, multi-level fills, buy/sell ledger,
+      idempotency, conflicting retry, invalid input, no shorting, IOC cancellation
+PASS: isolated reset and persisted cash
+```
+
+The matching calls used the running Go service, not mocked fills. A huge AAPL order initially proved that finite synthetic liquidity can produce an affordable partial fill: insufficient cash must be asserted against executable fill cost, not requested notional. The final insufficient-cash scenario uses MSFT liquidity whose actual executable cost exceeds the available balance.
+
+## Browser journey
+
+A disposable local identity registered through the UI with $100,000 cash and no holdings. The browser searched AAPL, reviewed and bought two shares for $474.84, then sold one for $237.35. The resulting cash was $99,762.51 with one AAPL share. Portfolio and activity showed those changes. Logout/login restored the same cash, position, and orders. A $1 NVDA limit cancelled without changing cash. Password recovery generated a local email, the link set a new password, and login with that password restored the saved account.
+
+Responsive checks covered 1440×1024, 1024×900, 768×1024, 390×844, and 320×740. No page-level horizontal overflow was found in the inspected states. Holdings tables scroll inside their container. The reset dialog dismissed with Escape without clearing the test portfolio. Sidebar labels, menus, signup, login, recovery, and password reveal controls were inspected. Browser console error log: empty.
+
+Evidence is in `docs/screenshots/`. The selected concept and browser implementation were compared together at full-view and focused scales; see `design-qa.md` for corrections, normalization, intentional differences, and the passing local result.
+
+## Hosting readiness and limits
+
+Read-only Vercel metadata confirms the existing `dricmoys-projects/lot-trading-lab` project, Node 24, and database/application secret configuration. No SMTP or sender variables are configured. Production publishing must apply the additive Django authentication migration, configure email, deploy, and exercise the live authentication and trading flow. See `docs/AUTHENTICATION.md`.
+
+Local checks use SQLite. The new authentication changes have not been tested on hosted PostgreSQL, in other browser engines, under load, or through an independent security/accessibility audit. Real private Alpaca delivery was not re-tested in this local redesign. Public-market prices and all executions remain simulated. No remote source, environment, database, or deployment was changed.
+
+---
+
+## Archived evidence from the earlier public version
+
+The following record is retained for historical context. It is not evidence that the October redesign is deployed.
+
 # Verification — September 14, 2026
 
 Live application: https://lot-trading-lab.vercel.app
