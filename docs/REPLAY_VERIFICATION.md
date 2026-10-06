@@ -9,7 +9,7 @@ Recorded October 6, 2026. These are bounded observations of this implementation,
 | Frontend production build | Passed; 2,177 transformed modules |
 | Frontend lint | Passed |
 | Frontend tests | 10 passed, including older same-account cash/watchlist responses |
-| Django on isolated PostgreSQL 16 | 57 passed, no skips; 4.971 seconds |
+| Django on isolated PostgreSQL 16 | 60 passed, no skips; includes the additional news adapter/isolation checks |
 | Ruff | Passed |
 | Migration drift | No changes detected |
 | Go race-enabled tests | API and engine packages passed; server has no test files |
@@ -29,7 +29,7 @@ Six PostgreSQL concurrency cases each used four simultaneous workers: identical 
 
 At the observed 1280 × 720 desktop viewport: guest library and scenario choice, actual market order review/confirmation, a saved reason/reflection after reload, resting limit reservation/cancellation, early completion recap, notes-excluded shared page, revocation, repeat scenario opening, 4× playback, fictional dispatch reveal, and automatic 16:00 completion were inspected. The interface displayed the saved values rather than mock screenshots.
 
-Phone breakpoints are implemented for the library, toolbar, ticket, journal, recap, shared page, and landing section. **The browser viewport override did not take effect:** after requesting 390 × 844, the page still reported 1280 × 720. A fresh tab and reload gave the same result. The override was reset. Consequently this release does not claim a completed phone visual or cross-browser check. Validate on an actual phone or functioning responsive browser before making that claim. Existing breakpoint rules were reviewed in source.
+Phone breakpoints were checked through the actual local app inside a 390 × 844 iframe after the browser's direct viewport override left it at 1280 × 720. The frame's document client/scroll widths both measured 375 pixels (15 pixels are reserved for the scrollbar), with no horizontal overflow. Library, four-item bottom navigation, order review, insufficient-share recovery through “Edit your plan,” successful buy, advancement, and recap were inspected. Screenshots are in `screenshots/replay-phone.png` and `screenshots/replay-phone-recap.png`; reproduce with `qa-replay-phone.html` while Vite runs. This checks responsive CSS in the current desktop browser, not Safari/Android browser behavior or physical touch input. The direct override was reset.
 
 ## Measured matching sample
 
@@ -48,7 +48,7 @@ This short loopback sample includes HTTP plus matching on synthetic depth. It ex
 
 ## Delivery
 
-Production migrations 0003 and 0004 applied successfully before publication. Original contents of 21 accounts, 42 positions, 2 orders and 2 ledger rows were preserved using original-column hashes. Read-only reconciliation passed for all 21 accounts and 2 orders; no replay rows existed before this release. Deployment, public flows, owner news and GitHub Actions results will be recorded after execution. The migration helper hashes pre-existing rows using their pre-migration column sets, outputs aggregate counts only, and never prints credentials or account contents.
+Production migrations 0003 and 0004 applied successfully before publication. Original contents of 21 accounts, 42 positions, 2 orders and 2 ledger rows were preserved using original-column hashes. Read-only reconciliation passed for all 21 accounts and 2 orders; no replay rows existed before this release. Initial production deployment `dpl_5gbVWopH4QpJwv3Nk38r2zZhhKmJ` reported READY and assigned https://lot-trading-lab.vercel.app. The public `replay_smoke.py` passed all three full-day scenarios, retries, notes/reload, ownership, sanitized sharing/revocation, independent cash, resting reservation/cancellation, valuation and feed isolation. [GitHub Actions run 37422666410](https://github.com/Dricmoy/lot-trading-lab/actions/runs/37422666410) passed every step on source e8b7fdd. The final news adapter/deploy probe and evidence update will be verified separately. The migration helper hashes pre-existing rows using their pre-migration column sets, outputs aggregate counts only, and never prints credentials or account contents.
 
 ## Remaining external evidence
 

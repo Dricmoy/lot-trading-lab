@@ -193,7 +193,7 @@ class RestingTests(TestCase):
         other.get("/api/account")
         self.assertEqual(other.post("/api/orders/journal", {"order_id": str(order.id), "reflection": "overwrite"}, content_type="application/json").status_code, 404)
 
-    @patch("backend.trading.news.urlopen")
+    @patch("backend.trading.news_provider.urlopen")
     def test_public_news_never_contacts_provider(self, upstream):
         client = Client()
         client.get("/api/account")

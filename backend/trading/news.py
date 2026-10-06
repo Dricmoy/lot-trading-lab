@@ -1,14 +1,12 @@
 """Owner-only attributed headlines. Provider content is never redistributed publicly."""
-import json
 import os
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlparse
-from urllib.request import Request, urlopen
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from .market import is_owner
 from .services import SYMBOLS
 from .views import resolve_account
+from .news_provider import fetch_headlines
 
 
 @require_GET
@@ -23,25 +21,8 @@ def news(request):
         if not key or not secret:
             response_data, status = {"error": "News is unavailable. Your practice account is unchanged."}, 503
         else:
-            query = urlencode({"symbols": symbol, "limit": 5, "sort": "desc", "include_content": "false"})
-            upstream = Request("https://data.alpaca.markets/v1beta1/news?" + query,
-                               headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret})
             try:
-                with urlopen(upstream, timeout=7) as result:
-                    data = json.load(result)
-                if not isinstance(data, dict) or not isinstance(data.get("news", []), list):
-                    raise ValueError("Invalid news response")
-                articles = []
-                for article in data.get("news", [])[:5]:
-                    if not isinstance(article, dict):
-                        continue
-                    url = article.get("url", "")
-                    if not isinstance(url, str):
-                        continue
-                    if urlparse(url).scheme not in ("http", "https"):
-                        continue
-                    articles.append({"id": str(article.get("id", "")), "headline": str(article.get("headline", ""))[:500],
-                                     "source": str(article.get("source", "Alpaca news"))[:80], "published_at": article.get("created_at"), "url": url})
+                articles = fetch_headlines(symbol, key, secret)
                 response_data = {"articles": articles, "available": True, "source": "Alpaca news", "symbol": symbol}
             except (HTTPError, URLError, TimeoutError, ValueError, TypeError):
                 response_data, status = {"error": "The news feed is unavailable. Please try again later."}, 503

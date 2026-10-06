@@ -77,3 +77,5 @@ Plan updated October 5: expanded from the recommended replay release to the full
 October 6 discovery: the in-app browser viewport capability silently left the page at 1280x720 after requesting 390x844, including a fresh tab/reload. Reset the override. Responsive code was reviewed but actual phone visual verification remains unclaimed; record the limitation in release evidence.
 
 October 6 production migration: 0003/0004 applied; original-column hashes preserved 21 accounts, 42 positions, 2 orders, 2 ledger rows. Production cash/fill reconciliation passed (21 accounts, 2 orders, 0 prior replays). No production credentials were printed or replaced.
+
+Phone review recovery: a local 390x844 iframe containing the actual app exercised responsive CSS, order failure/recovery, buy and recap. Document clientWidth equaled scrollWidth (375px excluding scrollbar). Actual mobile browser engines remain untested. Initial production deployment and all public replay HTTP checks passed; GitHub Actions run 37422666410 passed.
