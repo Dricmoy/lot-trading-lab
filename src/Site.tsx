@@ -259,27 +259,26 @@ function Landing() {
                   setVideoStarted(true);
                   setVideoError(false);
                 }}
-                onEnded={() => setVideoStarted(false)}
                 onError={() => setVideoError(true)}
                 controls
                 playsInline
                 preload="none"
-                poster="/demo/lot-walkthrough.jpg"
+                poster="/demo/lot-walkthrough-polished.jpg"
                 aria-label="Lot trading walkthrough"
                 aria-describedby="walkthrough-caption"
-                width="1440"
-                height="1024"
+                width="1920"
+                height="1080"
               >
-                <source src="/demo/lot-walkthrough.mp4" type="video/mp4" />
+                <source src="/demo/lot-walkthrough-polished.mp4" type="video/mp4" />
                 <track
                   kind="captions"
-                  src="/demo/lot-walkthrough.vtt"
+                  src="/demo/lot-walkthrough-polished.vtt"
                   srcLang="en"
                   label="English"
                   default
                 />
                 Your browser doesn't support video.{" "}
-                <a href="/demo/lot-walkthrough.mp4">Download the walkthrough</a>
+                <a href="/demo/lot-walkthrough-polished.mp4">Download the walkthrough</a>
                 .
               </video>
               {!videoStarted && !videoError && (
@@ -292,7 +291,7 @@ function Landing() {
                 >
                   <Play size={25} fill="currentColor" />
                   <span>
-                    Watch the walkthrough<small>40 seconds · No audio</small>
+                    Watch the walkthrough<small>48 seconds · No audio</small>
                   </span>
                 </button>
               )}
@@ -300,7 +299,7 @@ function Landing() {
             {videoError && (
               <p className="inline-error" role="alert">
                 The video couldn't load.{" "}
-                <a href="/demo/lot-walkthrough.mp4">Open the video directly</a>,
+                <a href="/demo/lot-walkthrough-polished.mp4">Open the video directly</a>,
                 or read the walkthrough below.
               </p>
             )}
@@ -316,7 +315,7 @@ function Landing() {
                 up. The demo includes a sample portfolio.
               </li>
               <li>
-                Choose Apple, enter two shares, and select Review buy. Confirm
+                Search for Apple, enter two shares, and select Review buy. Confirm
                 the order after checking the estimated cost.
               </li>
               <li>

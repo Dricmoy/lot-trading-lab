@@ -401,3 +401,9 @@ $ go vet ./...
 $ go build ./...
 (exit 0; no output)
 ```
+
+## October 5, 2026: polished recorded demo follow-up
+
+The landing now plays a 48.366667-second, 1920×1080, 60 fps H.264 film from a new genuine guest-session recording. Smooth camera zooms track actual clicks; an animated pointer and click pulses clarify actions. Eight view crossfades, chapter copy, and animated opening/closing titles complete the edit. New poster/captions/transcript and versioned assets accompany it. The play overlay stays off after completion so the closing invitation remains readable.
+
+All 2,902 frames decoded. Local desktop and 390×844 phone playback reached the end; no inspected phone horizontal overflow. Public playback reached `ended=true` with the correct duration/dimensions and no console errors. Public MP4 returned 200 `video/mp4`, matched the reviewed local SHA-256, and returned 206 for byte ranges. Poster/captions and `/api/health` returned 200. Production deployment: `dpl_VPEowvjXCiRE9NkwD4iuYWzUaKHU`, READY and aliased to the existing public site. Build, ESLint, Ruff, and whitespace checks passed; no test suites were added or run for this media-only follow-up. Full evidence: `docs/DEMO_FILM_QA.md`.

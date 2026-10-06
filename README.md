@@ -2,7 +2,7 @@
 
 Practice buying and selling stocks with virtual money. Lot includes a landing page, persistent accounts, a trading workspace, portfolios, and order history. Public prices are simulated. Owner-only private mode reads Alpaca IEX data; funds, liquidity, and executions remain simulated.
 
-**October 5 release:** published and verified on the live app. Includes the forest/ivory redesign, persistent accounts, a recorded 40-second walkthrough, and `/demo` access without signup. Production password-reset email delivery still needs an SMTP provider.
+**October 5 release:** published and verified on the live app. Includes the forest/ivory redesign, persistent accounts, a polished 48-second recorded walkthrough with smooth cursor zooms and transitions, and `/demo` access without signup. Production password-reset email delivery still needs an SMTP provider.
 
 **Live app: https://lot-trading-lab.vercel.app**
 
