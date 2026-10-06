@@ -116,4 +116,22 @@ describe("Account changes invalidate earlier responses", () => {
     store.dispatch(loadMarket.fulfilled(market, "new", "NVDA"));
     expect(store.getState().trading.market).toBeNull();
   });
+  it("rejects older valuations and reservations for the same account", () => {
+    store.dispatch(
+      setSession({
+        user: null,
+        account: { ...account, revision: 4, cash: 9000000 },
+      }),
+    );
+    store.dispatch(loadAccount.pending("older", undefined));
+    store.dispatch(
+      loadAccount.fulfilled(
+        { ...account, revision: 3, cash: 10000000, watchlist: ["TSLA"] },
+        "older",
+        undefined,
+      ),
+    );
+    expect(store.getState().trading.account?.cash).toBe(9000000);
+    expect(store.getState().trading.watchlist).toEqual(["AAPL"]);
+  });
 });

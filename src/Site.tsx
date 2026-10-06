@@ -28,6 +28,7 @@ import {
   useAppSelector,
 } from "./store";
 import type { Account, User } from "./types";
+import { SharedReplay } from "./Replay";
 
 type Session = { user: User | null; account: Account | null };
 type AuthMode = "signup" | "login" | "forgot-password" | "reset-password";
@@ -113,6 +114,9 @@ function Landing() {
       <header className="site-nav">
         <Wordmark />
         <nav className={menu ? "open" : ""} aria-label="Website navigation">
+          <Link href="/replay" onClick={() => setMenu(false)}>
+            Lot Replay
+          </Link>
           <a href="#practice" onClick={() => setMenu(false)}>
             The workspace
           </a>
@@ -269,7 +273,10 @@ function Landing() {
                 width="1920"
                 height="1080"
               >
-                <source src="/demo/lot-walkthrough-polished.mp4" type="video/mp4" />
+                <source
+                  src="/demo/lot-walkthrough-polished.mp4"
+                  type="video/mp4"
+                />
                 <track
                   kind="captions"
                   src="/demo/lot-walkthrough-polished.vtt"
@@ -278,7 +285,9 @@ function Landing() {
                   default
                 />
                 Your browser doesn't support video.{" "}
-                <a href="/demo/lot-walkthrough-polished.mp4">Download the walkthrough</a>
+                <a href="/demo/lot-walkthrough-polished.mp4">
+                  Download the walkthrough
+                </a>
                 .
               </video>
               {!videoStarted && !videoError && (
@@ -299,8 +308,10 @@ function Landing() {
             {videoError && (
               <p className="inline-error" role="alert">
                 The video couldn't load.{" "}
-                <a href="/demo/lot-walkthrough-polished.mp4">Open the video directly</a>,
-                or read the walkthrough below.
+                <a href="/demo/lot-walkthrough-polished.mp4">
+                  Open the video directly
+                </a>
+                , or read the walkthrough below.
               </p>
             )}
             <figcaption id="walkthrough-caption">
@@ -315,8 +326,8 @@ function Landing() {
                 up. The demo includes a sample portfolio.
               </li>
               <li>
-                Search for Apple, enter two shares, and select Review buy. Confirm
-                the order after checking the estimated cost.
+                Search for Apple, enter two shares, and select Review buy.
+                Confirm the order after checking the estimated cost.
               </li>
               <li>
                 Open Portfolio to see your cash and shares update from the
@@ -333,6 +344,73 @@ function Landing() {
               </li>
             </ol>
           </details>
+        </section>
+        <section
+          className="landing-replay"
+          aria-labelledby="landing-replay-title"
+        >
+          <div>
+            <span className="section-kicker">A day to learn from</span>
+            <h2 id="landing-replay-title">
+              Make the call.
+              <br />
+              Then see what follows.
+            </h2>
+            <p>
+              A steady climb. A sudden selloff. A volatile opening. Practice a
+              market day as it unfolds, write down your plan, and look back at
+              the result.
+            </p>
+            <Link href="/replay" className="button button-dark">
+              Try Lot Replay <ArrowUpRight size={18} />
+            </Link>
+            <small>
+              No signup. A fresh $100,000 balance for every session.
+            </small>
+          </div>
+          <div
+            className="landing-replay-preview"
+            aria-label="Illustration of progressive replay"
+          >
+            <span>LOTX · Fictional market session</span>
+            <div className="landing-replay-line">
+              <svg
+                viewBox="0 0 480 160"
+                role="img"
+                aria-label="An illustrative price line stops at the current moment, with the future hidden"
+              >
+                <path
+                  d="M0 120 L25 115 L48 124 L75 90 L95 98 L121 80 L147 85 L174 47 L196 62 L221 33 L248 40"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                />
+                <circle cx="248" cy="40" r="5" fill="currentColor" />
+                <path
+                  d="M248 0 V160"
+                  stroke="currentColor"
+                  strokeDasharray="3 5"
+                  opacity=".4"
+                />
+              </svg>
+              <span>The rest is still ahead.</span>
+            </div>
+            <div className="landing-replay-steps">
+              <span>
+                01 <strong>Your plan</strong>
+              </span>
+              <span>
+                02 <strong>Your decision</strong>
+              </span>
+              <span>
+                03 <strong>Your recap</strong>
+              </span>
+            </div>
+            <p>
+              Reveal a moment. Place a practice trade. Compare your decisions
+              with simply holding.
+            </p>
+          </div>
         </section>
         <section className="landing-intro" id="practice">
           <div className="intro-heading">
@@ -906,9 +984,11 @@ export default function Site() {
     document.title =
       path === "/"
         ? "Lot — Practice trading. At your own pace."
-        : path === "/app" || path === "/demo"
+        : path === "/app" || path === "/demo" || path.startsWith("/replay")
           ? "Your workspace — Lot"
-          : "Your account — Lot";
+          : path.startsWith("/s/")
+            ? "Shared replay recap — Lot"
+            : "Your account — Lot";
     if (!ready || error) return;
     if (user && ["/signup", "/login"].includes(path)) navigate("/app");
     if (
@@ -938,6 +1018,15 @@ export default function Site() {
         </button>
         <Link href="/">Back to Lot</Link>
       </div>
+    );
+  if (/^\/s\/[0-9a-f-]{36}$/.test(path))
+    return <SharedReplay token={path.slice(3)} />;
+  if (path === "/replay" || /^\/replay\/[0-9a-f-]{36}$/.test(path))
+    return (
+      <App
+        initialView="replay"
+        replayId={path === "/replay" ? undefined : path.slice(8)}
+      />
     );
   if (path === "/app" || path === "/demo")
     return user ||

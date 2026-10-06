@@ -12,6 +12,7 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,.vercel.app,test
 ROOT_URLCONF = "backend.urls"
 INSTALLED_APPS = ["django.contrib.auth", "django.contrib.contenttypes", "django.contrib.sessions", "backend.trading"]
 MIDDLEWARE = [
+    "backend.trading.middleware.RequestMetrics",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -56,3 +57,9 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Lot <accounts@localhost>")
 PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", f"https://{production_host}" if production_host else "http://127.0.0.1:5173")
+
+LOGGING = {
+    "version": 1, "disable_existing_loggers": False,
+    "handlers": {"lot_console": {"class": "logging.StreamHandler"}},
+    "loggers": {"lot.requests": {"handlers": ["lot_console"], "level": "INFO" if not DEBUG else "WARNING", "propagate": False}},
+}

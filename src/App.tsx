@@ -46,6 +46,7 @@ import {
   submitOrder,
   resetAccount,
   connectPrivate,
+  settleOrders,
 } from "./store";
 import {
   change,
@@ -58,6 +59,12 @@ import {
 import type { Asset, Order, OrderInput } from "./types";
 import AccountMenu from "./AccountMenu";
 import Dialog from "./Dialog";
+import ReplayWorkspace from "./Replay";
+import { navigate } from "./navigation";
+import { PortfolioHistory, OrderLearning, PrivateNews } from "./Insights";
+
+const orderIsOpen = (order: Order) =>
+  order.time_in_force === "gtc" && ["open", "partial"].includes(order.status);
 
 const assetColors: Record<string, string> = {
   HOOD: "#c5f36a",
@@ -138,6 +145,7 @@ function Sidebar() {
             { id: "trade", name: "Trading", icon: BarChart3 },
             { id: "portfolio", name: "Portfolio", icon: Wallet },
             { id: "activity", name: "Activity", icon: Activity },
+            { id: "replay", name: "Lot Replay", icon: RotateCcw },
           ] as const
         ).map(({ id, name, icon: Icon }) => (
           <button
@@ -145,11 +153,18 @@ function Sidebar() {
             aria-label={name}
             aria-current={view === id ? "page" : undefined}
             className={`nav-link ${view === id ? "active" : ""}`}
-            onClick={() => dispatch(setView(id))}
+            onClick={() => {
+              if (id === "replay") navigate("/replay");
+              else {
+                if (window.location.pathname.startsWith("/replay"))
+                  navigate(user ? "/app" : "/demo");
+                dispatch(setView(id));
+              }
+            }}
           >
             <Icon size={19} />
             <span>{name}</span>
-            {id === "trade" && <span className="nav-dot" />}
+            {view === id && <span className="nav-dot" />}
           </button>
         ))}
       </nav>
@@ -188,14 +203,14 @@ function Header() {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if (view !== "replay" && (e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         input.current?.focus();
       }
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  }, []);
+  }, [view]);
   const filtered =
     market?.assets.filter((a) =>
       `${a.symbol} ${a.name}`.toLowerCase().includes(search.toLowerCase()),
@@ -210,11 +225,12 @@ function Header() {
               trade: "Trading",
               portfolio: "Portfolio",
               activity: "Activity",
+              replay: "Lot Replay",
             }[view]
           }
         </strong>
       </div>
-      <div className="search-wrap">
+      <div className="search-wrap" hidden={view === "replay"}>
         <Search size={16} />
         <input
           ref={input}
@@ -468,6 +484,8 @@ function OrderTicket({ asset }: { asset: Asset }) {
   const [kind, setKind] = useState<"market" | "limit">("market");
   const [quantity, setQuantity] = useState("1");
   const [limit, setLimit] = useState("");
+  const [timeInForce, setTimeInForce] = useState<"ioc" | "gtc">("gtc");
+  const [reason, setReason] = useState("");
   const [review, setReview] = useState<OrderInput | null>(null);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState<Order | null>(null);
@@ -484,7 +502,8 @@ function OrderTicket({ asset }: { asset: Asset }) {
     }
   }, [asset.symbol]);
   const owned =
-    account?.positions.find((p) => p.symbol === asset.symbol)?.quantity ?? 0;
+    (account?.positions.find((p) => p.symbol === asset.symbol)?.quantity ?? 0) -
+    (account?.reserved_shares?.[asset.symbol] ?? 0);
   const estimated =
     Number(quantity) *
     (kind === "limit"
@@ -506,12 +525,23 @@ function OrderTicket({ asset }: { asset: Asset }) {
       setError(`You own ${owned} ${asset.symbol} shares.`);
       return;
     }
-    if (side === "buy" && estimated > (account?.cash ?? 0)) {
+    if (
+      side === "buy" &&
+      estimated > (account?.cash ?? 0) - (account?.reserved_cash ?? 0)
+    ) {
       setError("This order exceeds your buying power.");
       return;
     }
     requestKey.current = crypto.randomUUID();
-    setReview({ symbol: asset.symbol, side, kind, quantity: q, limit: cents });
+    setReview({
+      symbol: asset.symbol,
+      side,
+      kind,
+      quantity: q,
+      limit: cents,
+      time_in_force: kind === "limit" ? timeInForce : "ioc",
+      reason,
+    });
   }
   async function confirm() {
     if (!review || !requestKey.current) return;
@@ -523,6 +553,7 @@ function OrderTicket({ asset }: { asset: Asset }) {
       setConfirmation(result.order);
       setReview(null);
       requestKey.current = null;
+      setReason("");
       dispatch(loadMarket(asset.symbol));
     } catch (e) {
       setError(
@@ -550,14 +581,20 @@ function OrderTicket({ asset }: { asset: Asset }) {
               ? "Order filled"
               : confirmation.status === "partial"
                 ? "Partially filled"
-                : "Limit not reached"}
+                : orderIsOpen(confirmation)
+                  ? "Order is open"
+                  : "Limit not reached"}
           </h3>
           <p>
             {confirmation.executed
               ? `${confirmation.executed} ${confirmation.symbol} shares ${confirmation.side === "buy" ? "bought" : "sold"} for ${money(confirmation.total)}.`
               : "No shares traded at your limit price. Your balance is unchanged."}
           </p>
-          <span>Unfilled shares are cancelled immediately.</span>
+          <span>
+            {orderIsOpen(confirmation)
+              ? "Remaining shares stay open. Funds or shares are reserved until filled or cancelled; checks occur while the workspace is open."
+              : "Unfilled shares are cancelled immediately."}
+          </span>
           <button
             className="primary"
             onClick={() => {
@@ -607,9 +644,16 @@ function OrderTicket({ asset }: { asset: Asset }) {
               <dd>{money(estimated)}</dd>
             </div>
           </dl>
+          {review.reason && (
+            <p className="replay-reason">
+              <span>Your plan</span>
+              {review.reason}
+            </p>
+          )}
           <p className="execution-note">
-            Your order fills at available practice prices. Any unfilled shares
-            are cancelled immediately.
+            {review.time_in_force === "gtc"
+              ? "Unfilled shares stay open at your limit. Cash or shares are reserved. Orders are checked while your workspace is open."
+              : "Your order fills at available practice prices. Any unfilled shares are cancelled immediately."}
           </p>
           {error && (
             <div className="inline-error" role="alert">
@@ -718,8 +762,37 @@ function OrderTicket({ asset }: { asset: Asset }) {
                   onChange={(e) => setLimit(e.target.value)}
                 />
               </div>
+              <label className="field-label" htmlFor="time-in-force">
+                Unfilled shares
+              </label>
+              <div className="select-wrap">
+                <select
+                  id="time-in-force"
+                  value={timeInForce}
+                  onChange={(e) =>
+                    setTimeInForce(e.target.value as "ioc" | "gtc")
+                  }
+                >
+                  <option value="gtc">
+                    Keep open until filled or cancelled
+                  </option>
+                  <option value="ioc">Cancel immediately</option>
+                </select>
+                <ChevronDown size={15} />
+              </div>
             </>
           )}
+          <label className="field-label" htmlFor="trade-reason">
+            Your plan <span>Optional</span>
+          </label>
+          <textarea
+            className="ordinary-trade-reason"
+            id="trade-reason"
+            maxLength={1200}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Why this trade? What would change your mind?"
+          />
           <dl className="order-summary">
             <div>
               <dt>Market price</dt>
@@ -751,7 +824,12 @@ function OrderTicket({ asset }: { asset: Asset }) {
           </button>
           <div className="buying-power">
             <Wallet size={14} />
-            <strong>{account ? money(account.cash) : "—"}</strong> buying power
+            <strong>
+              {account
+                ? money(account.cash - (account.reserved_cash ?? 0))
+                : "—"}
+            </strong>{" "}
+            available buying power
           </div>
         </>
       )}
@@ -965,8 +1043,12 @@ function Portfolio() {
         <div className="card metric">
           <Wallet size={20} />
           <span>Buying power</span>
-          <h2>{money(account.cash)}</h2>
-          <small>Available for your next move</small>
+          <h2>{money(account.cash - (account.reserved_cash ?? 0))}</h2>
+          <small>
+            {account.reserved_cash
+              ? `${money(account.reserved_cash)} reserved for open orders`
+              : "Available for your next move"}
+          </small>
         </div>
         <div className="card metric">
           <Layers3 size={20} />
@@ -975,6 +1057,7 @@ function Portfolio() {
           <small>{account.positions.length} positions in your portfolio</small>
         </div>
       </div>
+      <PortfolioHistory key={account.id} />
       <section className="card holdings-card">
         <div className="section-heading">
           <h2>Your holdings</h2>
@@ -1162,11 +1245,23 @@ function ExecutionDetails({ order }: { order: Order }) {
             title: "Validated",
             detail: "Cash and shares checked",
           },
-          { icon: Zap, title: "Matched", detail: "Filled at available prices" },
+          {
+            icon: Zap,
+            title: order.executed
+              ? "Matched"
+              : orderIsOpen(order)
+                ? "Waiting"
+                : "Checked",
+            detail: order.executed
+              ? "Filled at available prices"
+              : "No shares filled yet",
+          },
           {
             icon: Layers3,
             title: "Recorded",
-            detail: "Portfolio updated",
+            detail: order.executed
+              ? "Portfolio updated"
+              : "Order saved to history",
           },
         ].map(({ icon: Icon, title, detail }, i) => (
           <div key={title}>
@@ -1184,7 +1279,12 @@ function ExecutionDetails({ order }: { order: Order }) {
           Matching time <strong>{order.result.duration_us} μs</strong>
         </span>
         <span>
-          Time in force <strong>Immediate or cancel</strong>
+          Time in force{" "}
+          <strong>
+            {order.time_in_force === "gtc"
+              ? "Until filled or cancelled"
+              : "Immediate or cancel"}
+          </strong>
         </span>
         <span>
           Request <strong>{order.id.slice(0, 8)}</strong>
@@ -1217,6 +1317,7 @@ function ExecutionDetails({ order }: { order: Order }) {
           hands.
         </p>
       )}
+      <OrderLearning order={order} />
     </div>
   );
 }
@@ -1226,8 +1327,19 @@ function ActivityView() {
   const dispatch = useAppDispatch();
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const orders =
-    account?.orders.filter((o) => filter === "all" || o.side === filter) ?? [];
+  const combined = [
+    ...new Map(
+      [...(account?.open_orders ?? []), ...(account?.orders ?? [])].map((o) => [
+        o.id,
+        o,
+      ]),
+    ).values(),
+  ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  const orders = combined.filter(
+    (o) =>
+      filter === "all" ||
+      (filter === "open" ? orderIsOpen(o) : o.side === filter),
+  );
   function exportCSV() {
     const rows = [
       [
@@ -1266,13 +1378,19 @@ function ActivityView() {
     <section className="card activity-card">
       <div className="section-heading">
         <div className="activity-filters">
-          {["all", "buy", "sell"].map((f) => (
+          {["all", "buy", "sell", "open"].map((f) => (
             <button
               key={f}
               className={filter === f ? "selected" : ""}
               onClick={() => setFilter(f)}
             >
-              {f === "all" ? "All orders" : f === "buy" ? "Buys" : "Sells"}
+              {f === "all"
+                ? "All orders"
+                : f === "buy"
+                  ? "Buys"
+                  : f === "sell"
+                    ? "Sells"
+                    : "Open orders"}
             </button>
           ))}
         </div>
@@ -1356,8 +1474,8 @@ function ActivityView() {
         </div>
       )}
       <div className="activity-footnote">
-        Your latest 50 orders. Export a copy of these trades whenever you need
-        it.
+        Your latest 50 orders and all open limits. Export a copy of your latest
+        trades whenever you need it.
       </div>
     </section>
   );
@@ -1372,7 +1490,13 @@ function ServiceLoading() {
   );
 }
 
-export default function App() {
+export default function App({
+  replayId,
+  initialView,
+}: {
+  replayId?: string;
+  initialView?: "replay";
+}) {
   const dispatch = useAppDispatch();
   const { symbol, view, market, account, accountError, marketError } =
     useAppSelector((s) => s.trading);
@@ -1381,6 +1505,10 @@ export default function App() {
   const [token, setToken] = useState("");
   const [connectError, setConnectError] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const settledObservation = useRef("");
+  useEffect(() => {
+    if (initialView) dispatch(setView(initialView));
+  }, [dispatch, initialView]);
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [view]);
@@ -1388,11 +1516,31 @@ export default function App() {
     dispatch(loadAccount());
   }, [dispatch]);
   useEffect(() => {
-    if (!account?.id) return;
+    if (!account?.id || view === "replay") return;
     dispatch(loadMarket(symbol));
     const timer = setInterval(() => dispatch(loadMarket(symbol)), 15000);
     return () => clearInterval(timer);
-  }, [dispatch, symbol, account?.id]);
+  }, [dispatch, symbol, account?.id, view]);
+  useEffect(() => {
+    if (
+      view !== "replay" &&
+      account?.id &&
+      market?.as_of &&
+      account.open_orders?.length
+    ) {
+      const observation = `${account.id}:${market.as_of}`;
+      if (settledObservation.current !== observation) {
+        settledObservation.current = observation;
+        dispatch(settleOrders(account.id));
+      }
+    }
+  }, [
+    dispatch,
+    account?.id,
+    market?.as_of,
+    view,
+    account?.open_orders?.length,
+  ]);
   const asset = market?.assets.find((a) => a.symbol === symbol);
   const titles = {
     trade: [
@@ -1403,6 +1551,10 @@ export default function App() {
     activity: [
       "Your activity.",
       "Review your orders and the shares that filled.",
+    ],
+    replay: [
+      "Practice a market day.",
+      "A plan, a decision, and a chance to learn.",
     ],
   };
   return (
@@ -1416,7 +1568,7 @@ export default function App() {
               <h1>{titles[view][0]}</h1>
               <p>{titles[view][1]}</p>
             </div>
-            <div className="session-info">
+            <div className="session-info" hidden={view === "replay"}>
               <span>
                 <span className="session-dot" />{" "}
                 {marketError
@@ -1454,7 +1606,17 @@ export default function App() {
               </button>
             </div>
           )}
-          {view === "trade" ? (
+          {view === "replay" ? (
+            account ? (
+              <ReplayWorkspace
+                key={account.id}
+                accountId={account.id}
+                sessionId={replayId}
+              />
+            ) : (
+              <ServiceLoading />
+            )
+          ) : view === "trade" ? (
             <>
               <div className="trading-grid">
                 <div className="main-column">
@@ -1464,6 +1626,12 @@ export default function App() {
                     <ServiceLoading />
                   )}
                   <Watchlist />
+                  {market?.source === "alpaca-iex" && (
+                    <PrivateNews
+                      key={`${account?.id}:${symbol}`}
+                      symbol={symbol}
+                    />
+                  )}
                 </div>
                 <div className="right-column">
                   {asset && <OrderTicket asset={asset} />}
@@ -1516,6 +1684,9 @@ export default function App() {
                 await dispatch(connectPrivate(token)).unwrap();
                 setToken("");
                 setPrivateDialog(false);
+                dispatch(setView("trade"));
+                if (window.location.pathname.startsWith("/replay"))
+                  navigate("/demo");
               } catch (error) {
                 setConnectError(
                   error instanceof Error

@@ -38,6 +38,11 @@ export type Order = {
   status: string;
   result: Execution;
   created_at: string;
+  limit?: number;
+  time_in_force?: "ioc" | "gtc";
+  reason?: string;
+  reflection?: string;
+  realized?: number | null;
 };
 export type Account = {
   id: string;
@@ -46,6 +51,10 @@ export type Account = {
   market_source?: string;
   positions: { symbol: string; quantity: number; cost: number }[];
   orders: Order[];
+  revision?: number;
+  open_orders?: Order[];
+  reserved_cash?: number;
+  reserved_shares?: Record<string, number>;
 };
 export type User = { name: string; email: string };
 export type OrderInput = {
@@ -54,4 +63,6 @@ export type OrderInput = {
   kind: "market" | "limit";
   quantity: number;
   limit: number;
+  time_in_force?: "ioc" | "gtc";
+  reason?: string;
 };

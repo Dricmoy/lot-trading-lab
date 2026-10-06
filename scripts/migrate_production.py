@@ -22,12 +22,14 @@ if connection.vendor != "postgresql":
     raise SystemExit("Production migration requires PostgreSQL; refusing another database.")
 
 
-def snapshot():
+def snapshot(column_sets=None):
     result = {}
+    column_sets = column_sets or {}
     with connection.cursor() as cursor:
         for table in ("trading_account", "trading_position", "trading_order", "trading_ledgerentry"):
-            # Limit account fields to existing columns so the additive upgrade compares cleanly.
-            columns = "id,cash,created_at" if table == "trading_account" else "*"
+            if table not in column_sets:
+                column_sets[table] = [column.name for column in connection.introspection.get_table_description(cursor, table)]
+            columns = ",".join(connection.ops.quote_name(column) for column in column_sets[table])
             cursor.execute(f"SELECT {columns} FROM {table} ORDER BY id")
             digest = hashlib.sha256()
             count = 0
@@ -35,13 +37,15 @@ def snapshot():
                 digest.update(repr(row).encode())
                 count += 1
             result[table] = (count, digest.hexdigest())
-    return result
+    return result, column_sets
 
 
-before = snapshot()
+before, original_columns = snapshot()
 print("Existing row counts:", {table: value[0] for table, value in before.items()})
 call_command("migrate", interactive=False, verbosity=1)
-after = snapshot()
+after, _ = snapshot(original_columns)
 if before != after:
     raise SystemExit("Trading snapshot changed during migration. Inspect concurrent writes before claiming preservation.")
 print("PASS: all existing account, position, order, and ledger row contents preserved.")
+
+call_command("reconcile", verbosity=1)

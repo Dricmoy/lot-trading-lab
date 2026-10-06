@@ -47,12 +47,50 @@ export const saveWatchlist = createAsyncThunk(
       body: JSON.stringify({ watchlist }),
     }),
 );
+export const settleOrders = createAsyncThunk(
+  "trading/settle",
+  async (accountId: string) => ({
+    accountId,
+    ...(await api<{ account: Account }>("/api/orders/settle", {
+      method: "POST",
+      body: "{}",
+    })),
+  }),
+);
+export const cancelOrder = createAsyncThunk(
+  "trading/cancel",
+  async ({ accountId, orderId }: { accountId: string; orderId: string }) => ({
+    accountId,
+    ...(await api<{ account: Account }>("/api/orders/cancel", {
+      method: "POST",
+      body: JSON.stringify({ order_id: orderId }),
+    })),
+  }),
+);
+export const saveReflection = createAsyncThunk(
+  "trading/journal",
+  async ({
+    accountId,
+    orderId,
+    reflection,
+  }: {
+    accountId: string;
+    orderId: string;
+    reflection: string;
+  }) => ({
+    accountId,
+    ...(await api<{ account: Account }>("/api/orders/journal", {
+      method: "POST",
+      body: JSON.stringify({ order_id: orderId, reflection }),
+    })),
+  }),
+);
 
 type State = {
   market: Market | null;
   account: Account | null;
   symbol: string;
-  view: "trade" | "portfolio" | "activity";
+  view: "trade" | "portfolio" | "activity" | "replay";
   watchlist: string[];
   marketError: string | null;
   accountError: string | null;
@@ -84,6 +122,15 @@ const initialState: State = {
   connectRequest: null,
   user: null,
 };
+function acceptAccount(state: State, account: Account) {
+  if (
+    state.account?.id === account.id &&
+    (account.revision ?? 0) < (state.account.revision ?? 0)
+  )
+    return;
+  state.account = account;
+  state.watchlist = account.watchlist;
+}
 const slice = createSlice({
   name: "trading",
   initialState,
@@ -146,8 +193,7 @@ const slice = createSlice({
       })
       .addCase(loadAccount.fulfilled, (s, a) => {
         if (s.accountRequest !== a.meta.requestId) return;
-        s.account = a.payload;
-        s.watchlist = a.payload.watchlist;
+        acceptAccount(s, a.payload);
         s.accountError = null;
         s.accountLoading = false;
       })
@@ -163,7 +209,7 @@ const slice = createSlice({
       .addCase(submitOrder.fulfilled, (s, a) => {
         if (s.orderRequest !== a.meta.requestId) return;
         s.pending = false;
-        s.account = a.payload.account;
+        acceptAccount(s, a.payload.account);
       })
       .addCase(submitOrder.rejected, (s, a) => {
         if (s.orderRequest !== a.meta.requestId) return;
@@ -185,7 +231,27 @@ const slice = createSlice({
       })
       .addCase(resetAccount.fulfilled, (s, a) => {
         if (s.resetRequest !== a.meta.requestId) return;
-        s.account = a.payload;
+        acceptAccount(s, a.payload);
+      })
+      .addCase(settleOrders.fulfilled, (s, a) => {
+        if (s.account?.id === a.payload.accountId) {
+          acceptAccount(s, a.payload.account);
+          s.accountError = null;
+        }
+      })
+      .addCase(settleOrders.rejected, (s, a) => {
+        if (s.account?.id === a.meta.arg)
+          s.accountError =
+            a.error.message ??
+            "Open orders could not be checked. Funds are unchanged.";
+      })
+      .addCase(cancelOrder.fulfilled, (s, a) => {
+        if (s.account?.id === a.payload.accountId)
+          acceptAccount(s, a.payload.account);
+      })
+      .addCase(saveReflection.fulfilled, (s, a) => {
+        if (s.account?.id === a.payload.accountId)
+          acceptAccount(s, a.payload.account);
       })
       .addCase(saveWatchlist.pending, (s, a) => {
         s.preferencesRequest = a.meta.requestId;

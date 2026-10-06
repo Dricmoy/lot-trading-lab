@@ -22,6 +22,14 @@ export function priceToCents(value: string): number {
   const [whole, fraction = ""] = value.split(".");
   return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
 }
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const csrf =
     document.cookie
@@ -43,7 +51,10 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
     );
   const data = await response.json();
   if (!response.ok)
-    throw new Error(data.error ?? "Something went wrong. Please try again.");
+    throw new ApiError(
+      data.error ?? "Something went wrong. Please try again.",
+      response.status,
+    );
   return data;
 }
 
