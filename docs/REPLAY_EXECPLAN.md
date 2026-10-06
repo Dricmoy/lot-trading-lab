@@ -16,7 +16,7 @@ A visitor can enter without signup, choose one of three reproducible synthetic m
 - [x] Persist valuation history, compute measured returns, add regular trade notes, and explain executions.
 - [x] Add optional owner-only real Alpaca news, usage counters, structured operational logging, reconciliation evidence, and CI.
 - [x] Update README with linked demo poster/video, feature walkthrough, architecture, constraints, and reproduction instructions.
-- [ ] Exercise real flows and reliability cases, inspect desktop/phone, build/lint, migrate safely, publish, and verify public behavior.
+- [x] (2026-10-06) Exercise real flows and reliability cases, inspect desktop/phone, build/lint, migrate safely, publish, and verify public behavior.
 
 ## Decision Log
 
@@ -70,14 +70,16 @@ The current engine intentionally uses immediate-or-cancel for both market and li
 
 ## Outcomes & Retrospective
 
-Functional implementation and local integration are complete. All 57 Django tests passed on disposable PostgreSQL 16, including six four-worker concurrency cases. Frontend build/lint and 10 tests passed; Go race tests/vet passed. Three full replay scenarios, ordinary resting cancellation/history, and existing auth/trading integration checks passed. Migration, publication and public verification remain. SMTP provider input and actual participant research are external dependencies; independently complete and publish the functional product/engineering release and state any remaining external setup precisely.
+The functional product and engineering release is complete and published. All 61 Django tests passed on disposable PostgreSQL 16, including six four-worker concurrency cases. Frontend build/lint and 10 tests passed; Go race tests/vet passed. Production migrations preserved existing records. Final source 4d731ea deployed READY, GitHub Actions run 37424327472 passed, and all three public full-day replay scenarios plus ordinary resting cancellation/history/feed isolation passed. The deployed private Alpaca news adapter returned five headlines. Saved desktop/phone screenshots document the observed UI. SMTP provider configuration and actual participant research remain external dependencies; neither mail delivery nor human study results are claimed.
 
 Plan updated October 5: expanded from the recommended replay release to the full roadmap after the user's explicit selection.
 
-October 6 discovery: the in-app browser viewport capability silently left the page at 1280x720 after requesting 390x844, including a fresh tab/reload. Reset the override. Responsive code was reviewed but actual phone visual verification remains unclaimed; record the limitation in release evidence.
+October 6 discovery: the in-app browser viewport capability silently left the page at 1280x720 after requesting 390x844, including a fresh tab/reload. Reset the override. Recovered responsive visual verification using the contained actual app as described below; physical phone and mobile browser behavior remain unclaimed.
 
 October 6 production migration: 0003/0004 applied; original-column hashes preserved 21 accounts, 42 positions, 2 orders, 2 ledger rows. Production cash/fill reconciliation passed (21 accounts, 2 orders, 0 prior replays). No production credentials were printed or replaced.
 
 Phone review recovery: a local 390x844 iframe containing the actual app exercised responsive CSS, order failure/recovery, buy and recap. Document clientWidth equaled scrollWidth (375px excluding scrollbar). Actual mobile browser engines remain untested. Initial production deployment and all public replay HTTP checks passed; GitHub Actions run 37422666410 passed.
 
 Final review refinement: give the replay library/session their own h1 and remove the duplicate workspace heading so decisions appear sooner. Return all saved sessions (bounded by the 200-session quota) using selected JSON scalars, with 30-row progressive display. The 61 PostgreSQL checks and frontend build/lint/10 tests passed after these changes.
+
+Final publication checkpoint: dpl_HVkLUEGmZrv8fzS5LPGCi8ypy8HM assigned the production alias on October 6. No pending migrations; aggregate read-only reconciliation passed for 25 accounts, 3 orders and 7 replays at the checkpoint. Final public desktop proof is docs/screenshots/replay-live.png. The existing 48.37-second recorded walkthrough remains linked prominently in README. Full evidence and limits are in docs/REPLAY_VERIFICATION.md.
