@@ -556,9 +556,10 @@ function Landing() {
               </summary>
               <p>
                 Your limit sets the most you'll pay to buy or the least you'll
-                accept to sell. Orders fill against available simulated prices
-                right away; any unfilled shares are cancelled. Orders don't stay
-                open.
+                accept to sell. Keep the unfilled shares open and Lot checks
+                them as you use the workspace, or choose Cancel immediately. You
+                can cancel an open remainder to release its reserved cash or
+                shares. Replay limits expire when the session ends.
               </p>
             </details>
             <details>
@@ -914,6 +915,21 @@ function Information({ privacy }: { privacy: boolean }) {
               account. Signing out ends your session. Registered portfolios stay
               saved until you reset them.
             </p>
+            <h2>Replay and sharing</h2>
+            <p>
+              Your replay sessions, reasons, reflections, and observed portfolio
+              values are saved with your workspace. Recaps remain private until
+              you create a sharing link. Journal notes are excluded unless you
+              choose to include them. Anyone with the link can view the shared
+              recap; revoking the link stops further access.
+            </p>
+            <p>
+              Resetting the regular portfolio preserves replay sessions and
+              earlier valuation records. Anonymous activity totals count
+              workspaces, including verification sessions, rather than people.
+              Operational logs record request status and timing without journal
+              text, credentials, or account identifiers.
+            </p>
             <h2>Your practice data</h2>
             <p>
               You can export your recent orders from Activity and clear your
@@ -936,10 +952,12 @@ function Information({ privacy }: { privacy: boolean }) {
             </p>
             <h2>What the numbers mean</h2>
             <p>
-              Public prices and available liquidity are simulated. Orders
-              execute immediately or cancel any unfilled shares. Portfolio
-              returns describe this practice scenario and do not represent
-              performance in the real market. Lot provides no investment advice.
+              Public prices and available liquidity are simulated. Market orders
+              cancel unfilled shares immediately; limit remainders can stay open
+              with reserved funds or shares. Replay reveals fictional prices and
+              dispatches as its clock advances. Returns describe the practice
+              scenario and do not represent performance in the real market. Lot
+              provides no investment advice.
             </p>
           </>
         )}

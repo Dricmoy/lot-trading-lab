@@ -1,5 +1,7 @@
 # Lot — Your trading ground
 
+[![Quality and accounting](https://github.com/Dricmoy/lot-trading-lab/actions/workflows/quality.yml/badge.svg)](https://github.com/Dricmoy/lot-trading-lab/actions/workflows/quality.yml)
+
 Practice making trading decisions with virtual money. Choose a synthetic market day in Lot Replay, reveal it as you go, write your plan, and review the result. Lot also includes a regular trading workspace, persistent accounts, portfolios, and order history. Public prices are simulated. Owner-only private mode reads Alpaca IEX data; funds, liquidity, and executions remain simulated.
 
 **Replay release:** three reproducible scenarios, saved plans/reflections, performance recaps, explicit sharing, resting limit orders, observed portfolio history, and owner-only news. Production password-reset email delivery still needs an SMTP provider. See [release evidence](docs/REPLAY_VERIFICATION.md) and the [five-person usability script](docs/USER_RESEARCH.md).
@@ -166,7 +168,7 @@ The browser never receives database credentials, Alpaca credentials, or the Djan
 
 Set production-only **Secret** environment variables `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and a random 32+ character `LOT_OWNER_ACCESS_TOKEN`. Use paper keys. The market provider calls `https://data.alpaca.markets/v2/stocks/...` with `feed=iex`; the news adapter calls `https://data.alpaca.markets/v1beta1/news` for up to five attributed headlines with `include_content=false`; it never calls any Alpaca order, funding, account, or live brokerage endpoint. Credentials never enter frontend bundles.
 
-Click **Private market data** and enter the owner token. This opens a separate, persistent $100,000 cash practice account. A signed HttpOnly cookie protects access; reconnecting with the token restores the same account across browsers. Rotating the token changes the owner account identity and revokes old owner access. The local deployment's token is in the gitignored `.env.owner`; keep that file private.
+Click **Private market data** and enter the owner token. This opens a separate, persistent $100,000 cash practice account. A signed HttpOnly cookie protects access; reconnecting with the token restores the same account across browsers. Rotating the token changes the owner account identity and revokes old owner access. Store the owner token privately, for example in a password manager, and reuse it when reconnecting. Secret environment values are excluded from the repository.
 
 Django checks the signed account identity before adding an internal, domain-separated SHA-256 token to Go requests. Browser-supplied upstream auth headers are ignored. Direct public Go calls retain synthetic data. Both displayed prices and simulated executions use Alpaca snapshots for the owner account. No provider error silently falls back to simulated quotes; expired-cache refresh failures return 503 and prevent account mutation. Snapshots cache for 30 seconds and selected-symbol bars for 60 seconds per warm Go process; cold starts and independent instances have separate caches. Each provider HTTP request times out after 7 seconds. Public responses and private proxy responses prohibit caching.
 
