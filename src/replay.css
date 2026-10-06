@@ -16,7 +16,7 @@
   align-items: center;
   padding: 36px 0 44px;
 }
-.replay-library-intro h2 {
+.replay-library-intro h1 {
   font: 600 clamp(36px, 4vw, 58px)/1.12 var(--font-display);
   letter-spacing: -2.2px;
   margin: 0 0 20px;
@@ -243,7 +243,7 @@
 .replay-back svg {
   transform: rotate(180deg);
 }
-.replay-session-title h2 {
+.replay-session-title h1 {
   font: 600 35px/1.2 var(--font-display);
   letter-spacing: -1.2px;
   margin: 7px 0 0;
@@ -880,7 +880,7 @@
   .replay-library-intro {
     padding: 15px 0 30px;
   }
-  .replay-library-intro h2 {
+  .replay-library-intro h1 {
     font-size: 39px;
     letter-spacing: -1.5px;
   }
@@ -1164,4 +1164,8 @@
   .landing-replay-preview {
     padding: 1.5rem;
   }
+}
+
+.page-heading[hidden] {
+  display: none;
 }

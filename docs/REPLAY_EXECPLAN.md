@@ -79,3 +79,5 @@ October 6 discovery: the in-app browser viewport capability silently left the pa
 October 6 production migration: 0003/0004 applied; original-column hashes preserved 21 accounts, 42 positions, 2 orders, 2 ledger rows. Production cash/fill reconciliation passed (21 accounts, 2 orders, 0 prior replays). No production credentials were printed or replaced.
 
 Phone review recovery: a local 390x844 iframe containing the actual app exercised responsive CSS, order failure/recovery, buy and recap. Document clientWidth equaled scrollWidth (375px excluding scrollbar). Actual mobile browser engines remain untested. Initial production deployment and all public replay HTTP checks passed; GitHub Actions run 37422666410 passed.
+
+Final review refinement: give the replay library/session their own h1 and remove the duplicate workspace heading so decisions appear sooner. Return all saved sessions (bounded by the 200-session quota) using selected JSON scalars, with 30-row progressive display. The 61 PostgreSQL checks and frontend build/lint/10 tests passed after these changes.

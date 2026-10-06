@@ -429,6 +429,7 @@ export default function ReplayWorkspace({
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [session, setSession] = useState<ReplaySession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [visibleSessions, setVisibleSessions] = useState(30);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
@@ -655,11 +656,11 @@ export default function ReplayWorkspace({
         <div className="replay-library-intro">
           <div>
             <span className="replay-eyebrow">Lot Replay</span>
-            <h2>
+            <h1>
               Make a plan.
               <br />
               See what happens.
-            </h2>
+            </h1>
             <p>
               Practice a market day in a few minutes. Prices and fictional
               dispatches unfold as you go. Your future chart stays hidden.
@@ -731,7 +732,7 @@ export default function ReplayWorkspace({
         <section className="replay-saved">
           <h2>Your saved sessions.</h2>
           {catalog?.sessions.length ? (
-            catalog.sessions.map((s) => (
+            catalog.sessions.slice(0, visibleSessions).map((s) => (
               <button
                 className="replay-saved-row"
                 key={s.id}
@@ -762,6 +763,14 @@ export default function ReplayWorkspace({
               </p>
             </div>
           )}
+          {catalog && catalog.sessions.length > visibleSessions && (
+            <button
+              className="replay-text-button"
+              onClick={() => setVisibleSessions((v) => v + 30)}
+            >
+              Show older sessions <ArrowRight size={16} />
+            </button>
+          )}
         </section>
       </div>
     );
@@ -791,7 +800,7 @@ export default function ReplayWorkspace({
         </button>
         <div>
           <span>Fictional market session</span>
-          <h2>{session.title}</h2>
+          <h1>{session.title}</h1>
         </div>
         <p>{session.lesson}</p>
       </div>

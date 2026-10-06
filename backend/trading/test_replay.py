@@ -124,6 +124,13 @@ class ReplayTests(TestCase):
                     self.assertTrue(state["finished"])
                     self.assertEqual(reserved(state), (0, 0))
 
+    def test_library_exposes_all_saved_sessions_without_journal_blobs(self):
+        account = Account.objects.get(id=self.account["id"])
+        ReplaySession.objects.bulk_create([ReplaySession(account=account, scenario="steady-climb", start_key=uuid.uuid4(), start_fingerprint="", state=initial_state("steady-climb", "standard")) for _ in range(35)])
+        sessions = self.client.get("/api/replay").json()["sessions"]
+        self.assertEqual(len(sessions), 36)
+        self.assertTrue(all("orders" not in s and "history" not in s and "prices" not in s for s in sessions))
+
     def test_shared_liquidity_does_not_regenerate_per_click(self):
         self.action("order", side="buy", kind="market", quantity=100, reason="first")
         self.action("order", side="buy", kind="market", quantity=100, reason="second")

@@ -1563,7 +1563,7 @@ export default function App({
       <div className="app-main">
         <Header />
         <main>
-          <div className="page-heading">
+          <div className="page-heading" hidden={view === "replay"}>
             <div>
               <h1>{titles[view][0]}</h1>
               <p>{titles[view][1]}</p>

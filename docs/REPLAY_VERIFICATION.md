@@ -9,7 +9,7 @@ Recorded October 6, 2026. These are bounded observations of this implementation,
 | Frontend production build | Passed; 2,177 transformed modules |
 | Frontend lint | Passed |
 | Frontend tests | 10 passed, including older same-account cash/watchlist responses |
-| Django on isolated PostgreSQL 16 | 60 passed, no skips; includes the additional news adapter/isolation checks |
+| Django on isolated PostgreSQL 16 | 61 passed, no skips; 4.780 seconds; includes news isolation and the complete saved-session catalog |
 | Ruff | Passed |
 | Migration drift | No changes detected |
 | Go race-enabled tests | API and engine packages passed; server has no test files |
@@ -48,7 +48,7 @@ This short loopback sample includes HTTP plus matching on synthetic depth. It ex
 
 ## Delivery
 
-Production migrations 0003 and 0004 applied successfully before publication. Original contents of 21 accounts, 42 positions, 2 orders and 2 ledger rows were preserved using original-column hashes. Read-only reconciliation passed for all 21 accounts and 2 orders; no replay rows existed before this release. Initial production deployment `dpl_5gbVWopH4QpJwv3Nk38r2zZhhKmJ` reported READY and assigned https://lot-trading-lab.vercel.app. The public `replay_smoke.py` passed all three full-day scenarios, retries, notes/reload, ownership, sanitized sharing/revocation, independent cash, resting reservation/cancellation, valuation and feed isolation. [GitHub Actions run 37422666410](https://github.com/Dricmoy/lot-trading-lab/actions/runs/37422666410) passed every step on source e8b7fdd. The final news adapter/deploy probe and evidence update will be verified separately. The migration helper hashes pre-existing rows using their pre-migration column sets, outputs aggregate counts only, and never prints credentials or account contents.
+Production migrations 0003 and 0004 applied successfully before publication. Original contents of 21 accounts, 42 positions, 2 orders and 2 ledger rows were preserved using original-column hashes. Read-only reconciliation passed for all 21 accounts and 2 orders; no replay rows existed before this release. Initial production deployment `dpl_5gbVWopH4QpJwv3Nk38r2zZhhKmJ` reported READY and assigned https://lot-trading-lab.vercel.app. The public `replay_smoke.py` passed all three full-day scenarios, retries, notes/reload, ownership, sanitized sharing/revocation, independent cash, resting reservation/cancellation, valuation and feed isolation. [GitHub Actions run 37422666410](https://github.com/Dricmoy/lot-trading-lab/actions/runs/37422666410) passed every step on source e8b7fdd. [The news adapter CI run 37423535225](https://github.com/Dricmoy/lot-trading-lab/actions/runs/37423535225) also passed. A final UI/catalog refinement and the deployment news probe will be recorded after execution. The migration helper hashes pre-existing rows using their pre-migration column sets, outputs aggregate counts only, and never prints credentials or account contents.
 
 ## Remaining external evidence
 

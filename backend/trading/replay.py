@@ -302,9 +302,11 @@ def collection(request):
         return reply({"error": "Open a practice workspace first."}, 401)
     if request.method == "GET":
         catalog = [{"id": key, **{k: v for k, v in item.items() if k != "news"}} for key, item in CATALOG.items()]
-        sessions = [{"id": str(s.id), "scenario": s.scenario, "title": CATALOG[s.scenario]["title"], "step": s.state["step"],
-                     "finished": s.state["finished"], "return": metrics(s.state, prices(s.scenario))["return"], "created_at": s.created_at.isoformat()}
-                    for s in account.replays.order_by("-created_at")[:30]]
+        # Select small JSON scalars rather than loading every journal/history blob.
+        rows = account.replays.order_by("-created_at").values("id", "scenario", "created_at", "state__step", "state__finished", "state__cash", "state__shares")[:200]
+        sessions = [{"id": str(s["id"]), "scenario": s["scenario"], "title": CATALOG[s["scenario"]]["title"], "step": s["state__step"],
+                     "finished": s["state__finished"], "return": (s["state__cash"] + s["state__shares"] * prices(s["scenario"])[s["state__step"]] - STARTING_CASH) / STARTING_CASH * 100,
+                     "created_at": s["created_at"].isoformat()} for s in rows]
         return reply({"scenarios": catalog, "sessions": sessions, "friction": FRICTION})
     try:
         data, key = request_data(request), request_key(request)
