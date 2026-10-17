@@ -35,19 +35,32 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
-          go-version: '1.23'
-          cache: false
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: server/pom.xml
       - run: npm ci
       - run: python -m pip install -r requirements-dev.txt
       - run: npm run build
       - run: npm run lint
       - run: npm test
       - run: ruff check .
-      - run: python manage.py makemigrations --check --dry-run
-      - run: python manage.py migrate --noinput
-      - run: python manage.py test
-      - run: python manage.py reconcile
-      - run: go test -race ./api ./engine ./cmd/server
-      - run: go vet ./api ./engine ./cmd/server
+      - run: cmake -S matching -B matching/build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build matching/build -j 2
+      - run: python matching/verify.py
+      - run: server/mvnw -B -s server/maven-settings.xml -f server/pom.xml verify
+      - name: Start the Java and C++ backend
+        env:
+          PUBLIC_APP_URL: http://127.0.0.1:8080
+        run: |
+          java -jar server/target/lot-server-2.0.0.jar --spring.web.resources.static-locations=file:dist/,classpath:/static/ > /tmp/lot-java.log 2>&1 &
+          python scripts/wait_for_http.py http://127.0.0.1:8080/api/health
+      - run: python scripts/auth_smoke.py http://127.0.0.1:8080
+      - run: python scripts/replay_smoke.py http://127.0.0.1:8080
+      - run: python scripts/java_compatibility.py http://127.0.0.1:8080
+      - run: java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true --server.port=0
+      - name: Show server diagnostics on failure
+        if: failure()
+        run: tail -100 /tmp/lot-java.log || true

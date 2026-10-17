@@ -1,27 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
-  "buildCommand": "python3 -m backend.news_probe && npm run build",
-  "outputDirectory": "dist",
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/engine",
-      "destination": "/api/engine.go"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
-  ],
+  "framework": "container",
   "headers": [
     {
       "source": "/(.*)",

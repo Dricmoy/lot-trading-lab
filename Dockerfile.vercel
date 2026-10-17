@@ -1,0 +1,40 @@
+# Frontend assets are served by Spring Boot, including the recorded demo.
+FROM node:24-bookworm-slim AS frontend
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY index.html tsconfig*.json vite.config.ts ./
+COPY src ./src
+COPY public ./public
+RUN npm run build
+
+# Build C++ on the same OS generation used by the final Java image.
+FROM ubuntu:22.04 AS matching
+RUN apt-get update && apt-get install -y --no-install-recommends cmake g++ make \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY matching/CMakeLists.txt matching/main.cpp ./
+RUN cmake -S . -B out -DCMAKE_BUILD_TYPE=Release && cmake --build out -j 2
+
+FROM maven:3.9.11-eclipse-temurin-21 AS java
+WORKDIR /build
+COPY server/pom.xml server/maven-settings.xml ./
+RUN mvn -B -ntp -s maven-settings.xml dependency:go-offline
+COPY server/src ./src
+COPY --from=frontend /build/dist ./src/main/resources/static
+RUN mvn -B -ntp -s maven-settings.xml verify
+
+FROM eclipse-temurin:21-jre-jammy
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --create-home lot
+WORKDIR /app
+COPY --from=java --chown=lot:lot /build/target/lot-server-2.0.0.jar ./lot.jar
+COPY --from=matching --chown=lot:lot /build/out/lot-matching ./lot-matching
+ENV LOT_MATCHING_BINARY=/app/lot-matching \
+    LOT_ENV=production \
+    PORT=8080 \
+    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=65 -XX:+ExitOnOutOfMemoryError"
+USER lot
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/lot.jar"]

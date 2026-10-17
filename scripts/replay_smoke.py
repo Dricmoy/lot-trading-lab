@@ -1,5 +1,6 @@
 """Exercise fresh disposable practice workspaces; never sign in or reset accounts."""
 import json
+import os
 import sys
 import uuid
 from http.cookiejar import CookieJar
@@ -16,6 +17,8 @@ class Browser:
 
     def call(self, path, body=None, key=None, csrf=True, expected=200):
         headers = {"Content-Type": "application/json", "Origin": base, "Referer": base + "/demo"}
+        if os.environ.get("VERCEL_AUTOMATION_BYPASS_SECRET"):
+            headers["x-vercel-protection-bypass"] = os.environ["VERCEL_AUTOMATION_BYPASS_SECRET"]
         if csrf:
             token = next((c.value for c in self.jar if c.name == "csrftoken"), "")
             headers["X-CSRFToken"] = token

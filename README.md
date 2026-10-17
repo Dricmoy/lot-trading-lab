@@ -20,13 +20,15 @@ The demo records actual guest buy/sell trades, portfolio updates, and completed 
 
 ## Stack
 
+The Java/C++ migration is being verified; the public alias has not switched yet. See [migration progress](docs/JAVA_MIGRATION_EXECPLAN.md).
+
 | Layer | Implementation |
 | --- | --- |
 | Client | React 19, TypeScript, Redux Toolkit, Vite, Recharts |
-| Account API | Python 3.12, Django 5.2 |
-| Matching engine | Go, standard library HTTP handlers, binary heap |
-| Persistence | PostgreSQL on Neon; SQLite for local development |
-| Hosting | Vercel static frontend + Python and Go serverless functions |
+| Account and replay API | Java 21, Spring Boot 4.1, Spring Security, JDBC, Flyway |
+| Matching engine | C++20, ordered price levels and FIFO queues |
+| Persistence | PostgreSQL; the existing Neon schema is preserved |
+| Hosting | OCI container containing Spring Boot, C++ and the built React app |
 
 ## What you can do
 
@@ -50,34 +52,32 @@ The demo records actual guest buy/sell trades, portfolio updates, and completed 
 - Track positions, cost basis, cash, total return, and allocation.
 - Filter trade history, export the latest 50 orders to CSV, and reset your own demo.
 
-New registered accounts start with $100,000 in virtual cash and no holdings. Guest workspaces include a seeded example portfolio with a $100,000 original cost basis; signing up from a guest workspace preserves its progress. Resetting creates a cash-only $100,000 portfolio. Django uses hashed passwords and Secure, HttpOnly, SameSite session cookies in production. Registered records persist in PostgreSQL and restore after login from another browser. Guests use a signed browser cookie for 30 days. No real-money trading is possible.
+New registered accounts start with $100,000 in virtual cash and no holdings. Guest workspaces include a seeded example portfolio with a $100,000 original cost basis; signing up from a guest workspace preserves its progress. Resetting creates a cash-only $100,000 portfolio. Spring Security protects mutations with CSRF tokens. Passwords use Django-compatible PBKDF2-SHA256, and opaque server sessions use Secure, HttpOnly, SameSite cookies in production. Existing Django passwords and signed identities remain compatible. Registered records persist in PostgreSQL and restore after login from another browser. Guests use a signed browser cookie for 30 days. No real-money trading is possible.
 
 ## Run locally
 
-Prerequisites: Node 22.12+ (Node 24 recommended), Python 3.12+, Go 1.23+, and `uv` or Python's venv/pip.
+Prerequisites: Node 24, JDK 21, a C++20 compiler, CMake 3.20+, and PostgreSQL. The Maven wrapper downloads a pinned, checksum-verified Maven distribution.
 
 ```sh
 npm ci
-uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python -r requirements-dev.txt
-.venv/bin/python manage.py migrate
+docker compose up -d postgres
+export DATABASE_URL='postgres://lot:local_disposable_password@127.0.0.1:54329/lot'
+cmake -S matching -B matching/build -DCMAKE_BUILD_TYPE=Release
+cmake --build matching/build -j 2
+server/mvnw -B -s server/maven-settings.xml -f server/pom.xml verify
+java -jar server/target/lot-server-2.0.0.jar
 ```
 
-Start these in three terminals:
+Then run `npm run dev` in another terminal and open http://127.0.0.1:5173. Vite proxies all `/api` requests to Java on port 8080. Java invokes the compiled C++ executable directly; no Python or Go service is involved. Flyway initializes an empty PostgreSQL database or adds Java session/recovery tables to the existing schema without replacing application rows. An existing native PostgreSQL installation can be used instead of Compose.
+
+Environment variables must be exported to the server process; Java does not load Vite environment files. See [.env.example](.env.example). On macOS with a Homebrew JDK, set `JAVA_HOME` to the JDK installation if the system Java command is a stub. Keep the original `DJANGO_SECRET_KEY` when connecting an existing database: it verifies old sessions and guest cookies.
+
+To serve the complete built app directly from Java:
 
 ```sh
-go run ./cmd/server
+npm run build
+java -jar server/target/lot-server-2.0.0.jar --spring.web.resources.static-locations=file:dist/,classpath:/static/
 ```
-
-```sh
-.venv/bin/python manage.py runserver 127.0.0.1:8000
-```
-
-```sh
-npm run dev
-```
-
-Open http://127.0.0.1:5173. Vite proxies `/api/engine` to Go on port 8001 and the other API routes to Django on port 8000. `.env.example` documents configurable server environment variables. Django reads the process environment, not Vite's `.env.local` file. Local runs default to SQLite, an explicitly development-only signing key, and trusted localhost origins.
 
 ## Verification
 
@@ -85,33 +85,34 @@ Open http://127.0.0.1:5173. Vite proxies `/api/engine` to Go on port 8001 and th
 npm run build
 npm run lint
 npm test
-.venv/bin/python manage.py test
-.venv/bin/ruff check .
-go test -race ./api ./engine ./cmd/server
-go vet ./api ./engine ./cmd/server
-go build ./api ./engine ./cmd/server
+server/mvnw -B -s server/maven-settings.xml -f server/pom.xml verify
+python3 matching/verify.py
+python3 scripts/auth_smoke.py http://127.0.0.1:8080
+python3 scripts/replay_smoke.py http://127.0.0.1:8080
+java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true --server.port=0
 ```
 
-Backend tests cover buy/sell accounting, idempotency and conflicting retries, cash constraints, insufficient holdings, partial fills, non-crossing limits, engine failure, CSRF, cookie tampering, and account isolation. Replay tests cover progressive reveal, persistent notes, stale revisions, conflicting retries, private sharing/revocation, shared liquidity, fee rounding, cash/share reservations, and event reconstruction. PostgreSQL tests exercise four simultaneous identical retries, competing purchases/sales, competing reservations, and both stale and duplicate replay actions; SQLite skips the six row-lock cases. Resting-order tests cover continuation fills, cancellation, invalid engine data, reconciliation, and ownership. Go tests cover price/time priority, best bid execution, limit bounds, and input rejection. Authentication tests cover CSRF, account ownership, copied cookies, guest promotion, session restoration, throttling, password changes, other-session revocation, and one-use reset links. Frontend tests cover exact currency parsing, portfolio valuation, chart windows, and stale responses after identity changes. See [replay release evidence](docs/REPLAY_VERIFICATION.md) for current results and [earlier verification](docs/VERIFICATION.md) for the prior release. The GitHub Actions workflow runs on a separate PostgreSQL 16 service. The deploy build also checks optional private news availability and prints only its status/count, without publisher content or credentials. It never connects to the production database. For integration checks against the three running local services:
+The Java suite covers deterministic replay parity against frozen legacy fixtures, canonical fingerprints, UUIDs, password hashes and signed cookies. The C++ oracle exercises 144 executions, four books and eleven invalid protocol inputs. HTTP checks exercise registration, trading, safe retries, ownership, replay, journal notes, sharing/revocation, reservations and observed history. Reconciliation checks cash movement chains, fills, reservations and replay reconstruction without changing records.
+
+The local-only migration harness also creates real Django records and verifies them through Java. It covers legacy sessions, Unicode passwords and notes, guest promotion, old/new one-use recovery links, session revocation, simultaneous duplicate orders, competing purchases/sales/reservations, and stale/duplicate replay actions. Python is used only by this development oracle, not by the deployed application:
 
 ```sh
-.venv/bin/python scripts/smoke.py http://127.0.0.1:5173
-.venv/bin/python scripts/auth_smoke.py http://127.0.0.1:5173
-.venv/bin/python scripts/replay_smoke.py http://127.0.0.1:5173
-.venv/bin/python manage.py reconcile
-.venv/bin/python scripts/benchmark.py
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r requirements-dev.txt
+.venv/bin/python scripts/java_compatibility.py http://127.0.0.1:8080
+.venv/bin/ruff check .
 ```
 
-Local password-reset messages are saved to the gitignored `.mailbox/` directory. See `docs/AUTHENTICATION.md` for email setup and deployment requirements.
+Use a disposable **local** database for this harness; it refuses remote hosts. GitHub Actions supplies an isolated PostgreSQL database and runs the Java/C++, frontend and HTTP checks. Local recovery messages are saved to the gitignored `.mailbox/` directory. Actual production email delivery still requires SMTP configuration; see [authentication](docs/AUTHENTICATION.md).
 
 ## API
 
 | Route | Method | Responsibility |
 | --- | --- | --- |
-| `/api/market?symbol=HOOD` | GET | Django: authenticated market proxy; private owner receives IEX data |
-| `/api/connect` | POST | Django: exchange owner access token for signed account cookie |
-| `/api/engine?symbol=HOOD` | GET | Go: simulated quotes, chart samples, and selected book |
-| `/api/engine` | POST | Go: stateless execution calculation; does not mutate accounts |
+| `/api/market?symbol=HOOD` | GET | Java: authenticated market proxy; private owner receives IEX data |
+| `/api/connect` | POST | Java: exchange owner access token for an opaque private session |
+| `/api/engine?symbol=HOOD` | GET | Java + C++: simulated quotes, chart samples, and selected book |
+| `/api/engine` | POST | C++ via Java: stateless execution calculation; does not mutate accounts |
 | `/api/auth/session` | GET | Restore identity and issue CSRF cookie |
 | `/api/auth/signup` | POST | Register and claim guest progress or open cash-only account |
 | `/api/auth/login` | POST | Authenticate and restore owned account |
@@ -120,8 +121,8 @@ Local password-reset messages are saved to the gitignored `.mailbox/` directory.
 | `/api/auth/forgot` | POST | Send one-use recovery link |
 | `/api/auth/reset` | POST | Validate recovery token and set password |
 | `/api/preferences` | POST | Save the current account watchlist |
-| `/api/account` | GET | Django: open/restore isolated account and issue CSRF cookie |
-| `/api/orders` | POST | Django: validate, match, and persist order + position + ledger |
+| `/api/account` | GET | Java: open/restore isolated account and issue CSRF cookie |
+| `/api/orders` | POST | Java: validate, match, and persist order + position + ledger |
 | `/api/orders/settle` | POST | Evaluate up to one eligible resting order, each at most once per 15-second bucket |
 | `/api/orders/cancel` | POST | Cancel owned remaining shares and release reservations |
 | `/api/orders/journal` | POST | Save an owned order reflection |
@@ -133,8 +134,8 @@ Local password-reset messages are saved to the gitignored `.mailbox/` directory.
 | `/api/replay/shared/<token>` | GET | Deliberately shared finished recap; notes excluded by default |
 | `/api/news?symbol=HOOD` | GET | Owner-only attributed Alpaca headlines |
 | `/api/learning-metrics` | POST | Owner-only aggregate workspace activity, including verification |
-| `/api/reset` | POST | Django: reset only the current demo account |
-| `/api/health` | GET | Django: database connectivity check |
+| `/api/reset` | POST | Java: reset only the current demo account |
+| `/api/health` | GET | Java: database connectivity check |
 
 Order example (money is integer cents):
 
@@ -146,27 +147,28 @@ Account mutations require a valid registered session, guest cookie, or owner ses
 
 ## Correctness and tradeoffs
 
-`transaction.atomic()` and `select_for_update()` serialize each PostgreSQL account's order/reset operations. The matching response, cash update, position cost basis, order, and cash-ledger entry form one transaction. Unique database constraints enforce per-account idempotency. Monetary values use integer cents throughout. Selling releases proportional cost basis using integer rounding; selling the entire position removes its complete remaining cost.
+JDBC transactions and PostgreSQL `SELECT ... FOR UPDATE` serialize each PostgreSQL account's order/reset operations. The matching response, cash update, position cost basis, order, and cash-ledger entry form one transaction. Unique database constraints enforce per-account idempotency. Monetary values use integer cents throughout. Selling releases proportional cost basis using integer rounding; selling the entire position removes its complete remaining cost.
 
 Replay actions lock their session, require a current revision and a UUID request key, and persist a payload fingerprint plus an event. The read-only reconciliation command reconstructs replay state from those events and checks ordinary cash anchors, movement chains, fill totals, and reservations. A stale version or conflicting retry returns 409. Sharing is explicit, notes are excluded by default, and revoked links return 404.
 
 [Attempt comparison](docs/ATTEMPT_COMPARISON.md) reuses saved events to reconstruct each decision's actual before/after state. It requires distinct, owned, completed attempts on the same scenario version. Shared order terms/timing form the tree's trunk; plans can differ. Charts and measurements stop at the last moment both attempts experienced; individual branches retain their own full endings. Different execution conditions are disclosed. The tree describes recorded choices and outcomes, without claiming that one choice alone caused a result. Private plans and reflections stay in the account workspace.
 
-The Go engine heapifies a synthetic book in O(n), then takes the best price and earliest sequence for each fill in O(log n). Total matching cost is O(n + k log n), where n is depth and k is fills. Limits protect execution prices; Go computes an immediate execution slice. Django keeps `gtc` limit remainders open and reserves their cash/shares; `ioc` remainders cancel. Ordinary resting orders are checked while the regular workspace is open, at most one eligible order per quote observation. Each order is checked at most once per 15-second bucket. This is request-driven evaluation, not a continuously running exchange. Replay limits are evaluated at each revealed moment and expire when the session ends. A buy that exceeds available cash at execution is rejected atomically. Network retries can safely reuse their key.
+The C++ engine builds an ordered price-level map and consumes FIFO liquidity from the best acceptable price. Building the eight-level synthetic slice costs O(P log P); matching walks the consumed levels. Limits protect execution prices. Java keeps `gtc` remainders open and reserves their cash/shares; `ioc` remainders cancel. Ordinary resting orders are checked while the regular workspace is open, at most one eligible order per quote observation and once per order per 15-second bucket. Replay limits are evaluated at each revealed moment and expire when the session ends. A buy exceeding available cash is rejected atomically.
 
-This is a simulation, not a production brokerage. Ordinary synthetic liquidity regenerates for each engine request; replay liquidity is shared across all orders within each virtual moment; there is no global exchange, consolidated market feed, WebSocket service, actual clearing/settlement, or real-money integration. Registered users have multi-browser identity; guest identities remain browser scoped. Market polling is every 15 seconds while the page is open. Public chart time is fictional. Private charts use the latest available regular trading session's IEX bars and explicitly show its date; sparse bars are not fabricated. Last-trade prices may be old outside trading hours. SQLite does not provide PostgreSQL row-lock concurrency guarantees. The account lock is held during the bounded engine request (25-second timeout): a simple correctness tradeoff that should become a reservation/outbox workflow at larger scale. Observed history saves one valuation per minute received by the workspace, up to the latest 5,000 observations per selected window. Straight lines connect sparse observations. A reset starts a new history epoch. Replay history records each revealed moment and trade cost changes. Structured production request logs include a generated request ID, route pattern, method, status, and duration; they exclude identities, credentials, query strings, and request bodies. See [architecture](docs/ARCHITECTURE.md).
+This is a simulation, not a production brokerage. Ordinary synthetic liquidity regenerates for each engine request; replay liquidity is shared across all orders within each virtual moment; there is no global exchange, consolidated market feed, WebSocket service, actual clearing/settlement, or real-money integration. Registered users have multi-browser identity; guest identities remain browser scoped. Market polling is every 15 seconds while the page is open. Public chart time is fictional. Private charts use the latest available regular trading session's IEX bars and explicitly show its date; sparse bars are not fabricated. Last-trade prices may be old outside trading hours. The account lock is held during the bounded C++ execution (three-second process deadline, up to two seconds waiting for capacity): a simple correctness tradeoff that should become a reservation/outbox workflow at larger scale. Observed history saves one valuation per minute received by the workspace, up to the latest 5,000 observations per selected window. Straight lines connect sparse observations. A reset starts a new history epoch. Replay history records each revealed moment and trade cost changes. Structured production request logs include a generated request ID, route pattern, method, status, and duration; they exclude identities, credentials, query strings, and request bodies. See [architecture](docs/ARCHITECTURE.md).
 
 ## Deploy to Vercel
 
-1. Install the Vercel CLI separately (`npm install -g vercel`), sign in, and run `vercel link`.
-2. Provision a separate Neon PostgreSQL database and connect it to this project.
-3. Set `DATABASE_URL` and a random `DJANGO_SECRET_KEY` in the deployment environments. Production startup fails closed if either is missing. Use a distinct database for future preview environments that must not share demo data.
-4. Apply migrations to the intended database **before** deployment, e.g. `vercel env run --environment production --project lot-trading-lab --scope dricmoys-projects -- .venv/bin/python scripts/migrate_production.py`. This is a manual deploy step; migrations do not run inside serverless requests.
-5. Configure `PUBLIC_APP_URL`, a verified `DEFAULT_FROM_EMAIL`, and the SMTP settings listed in `.env.example`. Verify delivery before advertising password recovery.
-6. Run `vercel --prod`. `vercel.json` builds the frontend and routes Python and Go independently.
-7. Verify `/api/health`, `/api/engine`, registration, a complete buy and sell, logout/login restoration, password recovery, and mobile layout.
+The root `Dockerfile.vercel` builds React assets, Java and C++ in separate stages, then packages a non-root Java 21 runtime with the matching executable. The final container has no Python or Go service. `vercel.json` explicitly selects the container framework and Spring serves both the API and frontend deep links.
 
-`MATCHING_ENGINE_URL` can override the Go endpoint. On Vercel it defaults to `https://$VERCEL_PROJECT_PRODUCTION_URL/api/engine`, keeping backend calls on the public production alias rather than a protected preview URL. `CSRF_TRUSTED_ORIGINS` is a comma-separated list for explicitly trusted proxy origins, normally unnecessary on the production same-origin app.
+1. Link the existing Vercel project; retain `DATABASE_URL`, `DJANGO_SECRET_KEY`, private provider credentials and owner token.
+2. Set `PORT=8080` in the intended deployment environment. Configure SMTP only if recovery delivery is wanted.
+3. Deploy a preview against a separate PostgreSQL database. Do not use search-path/schema isolation with a transaction pool: session settings can be lost between transactions. **Never promote a preview that overrides the production database URL.**
+4. Verify Java/C++ health, frontend routes, video delivery and all account/replay flows on that preview.
+5. Before production migration, capture original-row fingerprints using `scripts/database_snapshot.py capture` with a private manifest path. Flyway performs additive startup migration; verify original rows afterward using the same manifest and `verify` mode.
+6. Deploy production with the original database and signing key, without preview-schema overrides. Verify `/api/health` identifies Java/C++, then run disposable-account HTTP checks and read-only reconciliation. Keep the preceding deployment available for rollback.
+
+The production signing key and owner token must not be rotated during this migration. Existing tables and legacy code remain available as migration references; `.vercelignore` and the container build exclude the Python/Go entry points from deployment.
 
 The browser never receives database credentials, Alpaca credentials, or the Django signing key. Never put any of them in a `VITE_` variable or commit environment files.
 
@@ -175,9 +177,9 @@ The browser never receives database credentials, Alpaca credentials, or the Djan
 
 Set production-only **Secret** environment variables `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, and a random 32+ character `LOT_OWNER_ACCESS_TOKEN`. Use paper keys. The market provider calls `https://data.alpaca.markets/v2/stocks/...` with `feed=iex`; the news adapter calls `https://data.alpaca.markets/v1beta1/news` for up to five attributed headlines with `include_content=false`; it never calls any Alpaca order, funding, account, or live brokerage endpoint. Credentials never enter frontend bundles.
 
-Click **Private market data** and enter the owner token. This opens a separate, persistent $100,000 cash practice account. A signed HttpOnly cookie protects access; reconnecting with the token restores the same account across browsers. Rotating the token changes the owner account identity and revokes old owner access. Store the owner token privately, for example in a password manager, and reuse it when reconnecting. Secret environment values are excluded from the repository.
+Click **Private market data** and enter the owner token. This opens a separate, persistent $100,000 cash practice account. An opaque server session in an HttpOnly cookie protects access; reconnecting with the token restores the same account across browsers. Rotating the token changes the owner account identity and revokes old owner access. Store the owner token privately, for example in a password manager, and reuse it when reconnecting. Secret environment values are excluded from the repository.
 
-Django checks the signed account identity before adding an internal, domain-separated SHA-256 token to Go requests. Browser-supplied upstream auth headers are ignored. Direct public Go calls retain synthetic data. Both displayed prices and simulated executions use Alpaca snapshots for the owner account. No provider error silently falls back to simulated quotes; expired-cache refresh failures return 503 and prevent account mutation. Snapshots cache for 30 seconds and selected-symbol bars for 60 seconds per warm Go process; cold starts and independent instances have separate caches. Each provider HTTP request times out after 7 seconds. Public responses and private proxy responses prohibit caching.
+Java resolves the registered, guest or private-owner identity before accessing provider data. Browser-supplied internal market headers are ignored; direct public engine calls retain synthetic data. Both displayed prices and private simulated execution reference Alpaca snapshots. Provider errors return 503 and prevent account mutation. Quotes cache for 30 seconds and selected-symbol bars for 60 seconds per Java process. Each provider HTTP request has a seven-second deadline. API responses prohibit caching.
 
 IEX is one exchange, **not** consolidated US pricing or NBBO. Chart bars are five-minute closes from the latest regular session found within ten calendar days. Only the selected symbol loads chart history. Real timestamps are shown in Eastern time; market closures or sparse IEX trading can produce older data. Simulator liquidity is generated around the latest available trade, including after hours; these fills do not represent executable exchange quotes.
 

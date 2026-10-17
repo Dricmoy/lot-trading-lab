@@ -3,6 +3,7 @@
 import argparse
 from http.cookiejar import CookieJar
 import json
+import os
 import secrets
 from urllib.error import HTTPError
 from urllib.request import HTTPCookieProcessor, Request, build_opener
@@ -21,6 +22,8 @@ class Browser:
 
     def request(self, path, data=None, key=None, csrf=True):
         headers = {"Content-Type": "application/json", "Origin": origin}
+        if os.environ.get("VERCEL_AUTOMATION_BYPASS_SECRET"):
+            headers["x-vercel-protection-bypass"] = os.environ["VERCEL_AUTOMATION_BYPASS_SECRET"]
         if data is not None and csrf:
             headers["X-CSRFToken"] = next(c.value for c in self.jar if c.name == "csrftoken")
         if key:

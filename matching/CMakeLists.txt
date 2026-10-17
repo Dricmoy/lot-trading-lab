@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(lot_matching LANGUAGES CXX)
+add_executable(lot-matching main.cpp)
+target_compile_features(lot-matching PRIVATE cxx_std_20)
+target_compile_options(lot-matching PRIVATE -Wall -Wextra -Wpedantic -Werror)
+install(TARGETS lot-matching RUNTIME DESTINATION bin)
