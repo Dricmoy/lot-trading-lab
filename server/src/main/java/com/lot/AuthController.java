@@ -92,7 +92,7 @@ final class AuthController {
       @RequestBody Map<String, Object> data, HttpServletRequest request, HttpServletResponse res) {
     String email = identity.email(data);
     Object password = data.get("password");
-    if (!(password instanceof String p) || p.length() > 256)
+    if (!(password instanceof String p) || p.codePointCount(0, p.length()) > 256)
       throw new ApiException(400, "Check your email and password.");
     identity.limited(request, "login", email, 10);
     var user = db.one("SELECT * FROM auth_user WHERE username=? AND is_active=true", email);

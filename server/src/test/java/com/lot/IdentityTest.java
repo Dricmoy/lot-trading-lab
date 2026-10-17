@@ -6,6 +6,22 @@ import org.junit.jupiter.api.Test;
 
 class IdentityTest {
   @Test
+  void passwordBoundsCountUnicodeCharactersLikeDjango() throws Exception {
+    var identity = new Identity(null);
+    String password = "Fixture-" + "🌱".repeat(130);
+    assertTrue(password.length() > 256);
+    assertEquals(
+        password,
+        identity.password(Json.obj("password", password), "person@example.test", "Example"));
+    assertThrows(
+        ApiException.class,
+        () ->
+            identity.password(
+                Json.obj("password", "🌱".repeat(257)), "person@example.test", "Example"));
+    assertTrue(Identity.checkPassword(password, Identity.encodePassword(password)));
+  }
+
+  @Test
   void pbkdf2UsesDjangoCompatibleRepresentation() {
     String password = "Public fixture only 47!";
     String encoded = Identity.encodePassword(password);

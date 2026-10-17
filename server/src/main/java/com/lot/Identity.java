@@ -295,7 +295,9 @@ final class Identity {
 
   String password(Map<String, Object> data, String email, String name) {
     Object raw = data.get("password");
-    if (!(raw instanceof String p) || p.codePointCount(0, p.length()) < 10 || p.length() > 256)
+    if (!(raw instanceof String p)
+        || p.codePointCount(0, p.length()) < 10
+        || p.codePointCount(0, p.length()) > 256)
       throw new ApiException(400, "Enter a password between 10 and 256 characters.");
     String lower = p.toLowerCase(Locale.ROOT);
     if (p.matches("[0-9]+") || common.contains(lower.strip()))
