@@ -1,85 +1,104 @@
 # Migrate Lot to Spring Boot and C++
 
-This living ExecPlan follows the execution-plan skill. Keep Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective current. Work from `/Users/dricmoybhattacharjee/Desktop/lot-trading-lab`.
+This completed ExecPlan follows the execution-plan skill. Keep Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective current if extending the migration. Repository: `/Users/dricmoybhattacharjee/Desktop/lot-trading-lab`.
 
 ## Purpose / Big Picture
 
-Replace the running Django account/replay API with enterprise Java using Spring Boot, PostgreSQL transactions, Spring Security, Flyway, health checks and structured logs. Replace the Go execution service with C++ as chosen in the discussion. The React application, existing accounts, passwords, money, order history, replay sessions, comparisons and private Alpaca access must continue to work. The outcome is a running replacement, not a Java scaffold or proxy to Python.
+Replace Django and Go in the running application with Java and C++ while preserving accounts, credentials, virtual cash, positions, trades, replay sessions, journals, comparisons, private provider access, the frontend and recorded demo. The public application now runs the replacement at https://lot-trading-lab.vercel.app. Its `/api/health` identifies Java and C++; opening `/replay/compare?example=1` displays the same interactive decision tree, reconstructed by Java.
 
 ## Progress
 
-- [x] (2026-10-16) Inspect clean main at fd76114, all existing API routes, models, authentication, order services, replay and deployment contract.
-- [x] Verify available Java 21 installation and documented Spring Boot / Vercel container support.
-- [x] Add a Java build and runnable Spring Boot application with existing database compatibility and additive migrations.
-- [x] Preserve registered credentials, account ownership, guest progress, CSRF, session expiry, recovery and private-owner authorization.
-- [x] Implement ordinary accounts, transactions, reservations, history and private market/news adapters.
-- [x] Implement replay actions, event reconstruction, private comparisons and scripted example in Java.
-- [x] Replace Go execution with a compiled C++ engine using an explicit internal protocol.
-- [x] Verify local API parity, authentication/security boundaries, concurrency/accounting and actual Django-created saved data.
-- [ ] Verify browser flows, private provider access and deployment behavior.
-- [ ] Package containers, update local tools/docs/CI, deploy a preview, then switch production after evidence supports parity.
-- [ ] Retire Python/Go from the active runtime, audit all requirements and record final evidence.
+- [x] (2026-10-16) Inspect clean main fd76114, every legacy API route, models, authentication, trading, replay and deployment contract.
+- [x] Add Java 21, Spring Boot 4.1.1, JDBC transactions, Spring Security and additive Flyway migrations.
+- [x] Preserve old PBKDF2 passwords, signed guests, compressed Django sessions, ownership, recovery links and private-owner identity.
+- [x] Implement ordinary accounts, reservations, ledger, journal, observed portfolio history and private market/news adapters.
+- [x] Implement deterministic replay, event reconstruction, private comparisons and the public scripted example in Java.
+- [x] Replace Go execution with the compiled C++20 executable and a bounded numeric protocol.
+- [x] Verify all nine scenario/friction combinations against legacy state fixtures; pass 20 Java and ten frontend tests.
+- [x] Verify 144 C++ executions, four books and eleven rejected inputs.
+- [x] Verify real Django-created data, Unicode identities, recovery, concurrency, request boundaries and execution failures locally.
+- [x] Verify native browser trading, replay, saved plan/reflection and decision inspection, plus the public decision tree after cutover.
+- [x] Build the actual Linux container on Vercel; verify a separate-database deployment and private provider counts.
+- [x] Preserve every captured original record across eleven production tables; reconcile actual production records through Java.
+- [x] Verify the staged original-database deployment, switch the public alias, and rerun public checks without a bypass token.
+- [x] Retire Python/Go from active deployment and CI paths, retain source as an oracle, update README/demo and verification documentation.
 
 ## Context and Orientation
 
-The current API is `backend/trading/*.py` exposed by `backend/urls.py`; the stateless Go service is `engine/*.go` and `api/engine.go`. React expects the same routes and JSON fields via `src/lib.ts`. `backend/trading/models.py` defines the production PostgreSQL schema: existing `auth_user`, `django_session`, `trading_account`, positions, orders, ledger, order movements, valuation snapshots, replay sessions and events. Money is integer cents. Replay events use canonical SHA-256 fingerprints and deterministic UUID5 order IDs. Existing signed guest cookies and Django PBKDF2 password hashes require compatibility. A single account lock serializes money changes, and each replay session has revision and unique request-key guards.
+React and TypeScript remain in `src/`. The Java application is `server/src/main/java/com/lot/`, built with the pinned Maven wrapper in `server/`. `Identity` and `AuthController` own authentication; `Accounts` owns account transactions; `MarketData` selects synthetic or owner-only provider inputs; `ReplayEngine` applies deterministic replay actions and reconstructs decisions; `ReplayService` persists owned sessions and events; `Reconciliation` provides an offline read-only audit. `matching/main.cpp` is the C++ executable, built with CMake. `Dockerfile.vercel` packages the JRE, C++ executable and built React assets. Vercel explicitly selects the container framework.
+
+Legacy Python remains in `backend/` and `api/index.py`; Go remains in `engine/`, `cmd/` and `api/engine.go`. These paths are excluded from deployment. No Java endpoint forwards requests to them. They support development compatibility checks only. The existing PostgreSQL schema remains authoritative: auth_user, django_session and the trading account, position, order, ledger, order movement, portfolio snapshot, replay session, replay event and throttle tables. Money is integer cents. Java adds opaque-session and recovery-token tables; Flyway never cleans or replaces application data.
+
+## Milestones
+
+The first milestone made the Java application runnable against an isolated PostgreSQL database, retaining the exact route/JSON contract. Registered passwords and signed identity formats remained verifiable with the original signing key. It is demonstrated by the local Django-to-Java compatibility harness, including actual old session records and recovery tokens.
+
+The second milestone ported trading, reservations, history, provider selection, replay and comparisons, then replaced stateless execution with C++. State fixtures cover the complete replay path for three scenarios and three friction settings. HTTP checks demonstrate account cash and replay cash remain independent, retries do not duplicate operations, and requests cannot spend reserved resources.
+
+The third milestone built and exercised the real Linux container. A failed schema-isolation experiment exposed transaction-pool behavior; a separate database replaced it. A server-only provider probe confirmed eight assets, 78 bars and five attributed headlines without printing their contents. The final production deployment omits this diagnostic flag and uses the original database and signing key.
+
+The final milestone captured original-row fingerprints, verified additive startup migration, reconciled actual saved records in Java, checked a staged deployment, assigned the public alias, and reran public HTTP/browser verification. All original records remained unchanged after those checks. The README retains the recorded demo and now explains Java/C++ development and verification.
 
 ## Decision Log
 
-Use Java 21 and Spring Boot 4.1.1, explicit JDBC queries and PostgreSQL row locks. JDBC preserves the established schema and makes locking/accounting visible. Flyway owns only additive Java-specific session/recovery tables; it must never clean or replace existing tables. Keep legacy code as a reference until parity and deployment are demonstrated, then remove it from active build/deploy paths. Preserve the existing HTTP/JSON frontend contract.
+Use Java 21 and Spring Boot 4.1.1 with explicit JDBC and PostgreSQL row locks. This preserves the established schema and keeps account/ledger transactions visible. Spring Security supplies CSRF, cookie and header protections. Guest signatures and old sessions continue using the existing DJANGO_SECRET_KEY; no secret or owner token is rotated.
 
-Spring Security supplies CSRF and security headers. Persistent opaque sessions are server-owned; compatibility code validates Django sessions and signed guest cookies using the existing server secret, with PBKDF2 hash compatibility. No signing key or owner token is rotated. Credentials are never logged. Java calls a compiled C++ executable through a bounded input/output protocol; deployment packages both binaries, with no Python or Go process required. A future persistent exchange/forking engine is separate work; the migration preserves currently available behavior.
+Use a compiled C++ subprocess for the existing stateless execution contract, with eight concurrent permits, up to two seconds waiting for capacity, a three-second execution deadline, bounded output and independent fill validation. This fulfills the runtime migration without claiming a persistent exchange or new throughput result. The proposed branching state structures remain separate future work.
 
-Vercel currently documents its OCI container runtime as beta on all plans. Use a container preview to establish actual availability before changing the live alias. Any production schema change must be additive and accompanied by original-row integrity evidence. No user account reset or deletion is authorized as part of migration.
+Use idempotent creation for Java tables and indexes, baseline version zero for existing databases, and disable Flyway clean. Reconciliation runs with Flyway disabled in a read-only repeatable-read snapshot. Its local wrapper may supply an ephemeral process-local initialization key when Vercel cannot export Secret values; the wrapper does not issue cookies or change the deployed key.
 
-## Plan of Work
-
-Create `server/` for Maven sources in package `com.lot`, separating configuration, identity, account/trading, replay, market adapters and API controllers. Add `matching/` for the C++ engine and its CMake build. Implement shared canonical JSON/hash/UUID utilities before porting replay, so existing events reconstruct exactly. Preserve ordinary legacy fingerprint formatting as well as replay compact canonical formatting.
-
-Use existing production tables with additional Java session/recovery tables. Authenticate existing Django hashes and bridge valid legacy cookies/sessions. Record session revocation using the user's password hash so changing a password invalidates other sessions. Use database-backed rate limits. Never accept a browser-provided internal market authorization header.
-
-Implement ordinary trading with account row locks and replay with session row locks. Validate every execution response before accounting. Add equivalent data observation/history and owner-only market/news behavior. Port deterministic scenario paths, rounding, cost basis, reservations and action fingerprints without rewriting stored records. Comparison reconstructs observed owned completed sessions and keeps public scripted examples separate.
-
-Finally update Vite, container files and CI; demonstrate local and preview behavior with disposable identities. Capture counts and hashes of preserved data without exposing account contents. Promote only after the Java health endpoint and rendered app establish the actual runtime.
+Use a separate database for previews. Session-level search paths do not safely isolate data behind the hosted transaction pool. Preserve the original public alias until the original-database candidate has passed checks. Vercel's generated project alias can update even with --skip-domain; the public alias lot-trading-lab.vercel.app was reassigned explicitly only after verification.
 
 ## Concrete Steps
 
-Use the installed JDK under `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`. Bootstrap a pinned Maven distribution into a gitignored project tool folder if Maven is unavailable. Package the Java application with Maven, build C++ with CMake, and run against a separate local PostgreSQL database. Point Vite's `/api` proxy at Java on port 8080. Keep legacy local services available on their old ports for parity checks until cutover.
+For a new local setup, install Node 24, JDK 21, CMake 3.20+, a C++20 compiler and PostgreSQL. From the repository root run the commands below. The Compose database is disposable development storage; never reuse its published password for shared data.
 
-The user goal explicitly requires verification. Run contract/security/accounting checks against the Java service, include concurrent money and replay actions, and inspect actual browser trading/replay/comparison flows. Use only disposable accounts for mutations. Production verification reads existing records and performs mutations solely on fresh disposable identities.
+    npm ci
+    docker compose up -d postgres
+    export DATABASE_URL='postgres://lot:local_disposable_password@127.0.0.1:54329/lot'
+    cmake -S matching -B matching/build -DCMAKE_BUILD_TYPE=Release
+    cmake --build matching/build -j 2
+    server/mvnw -B -s server/maven-settings.xml -f server/pom.xml verify
+    java -jar server/target/lot-server-2.0.0.jar
+
+Run `npm run dev` in a second terminal and open http://127.0.0.1:5173. All API requests proxy to Java on port 8080. Alternatively build React and add `--spring.web.resources.static-locations=file:dist/,classpath:/static/` when starting the jar. Environment files are not automatically loaded by Java; export the documented variables. Maven's project settings force public dependencies through Maven Central without changing corporate user settings.
+
+The execution environment used an existing Homebrew JDK at `/opt/homebrew/opt/openjdk@21`, a private native PostgreSQL cluster on 127.0.0.1:55441 and a pinned Maven bootstrap under `.tools/`, because Docker Desktop did not respond. Its database URL is stored privately in `.tools/database-url`. The final local Java service runs on port 8080 from an immutable jar named in `.tools/current-runtime`. Do not overwrite a jar while it is running; rebuild separately and restart with a new immutable copy.
+
+The deployed backend commit is 3040f14c6ec45409e38eff8cb0695b545438285a. Deployment dpl_CaK3gPfLRAF3Fpyt1zg6FEuzgkXz uses image digest sha256:518d2188610fe0c918c50832b2f396a3a10fa314dcd44b7f5d75fd3be02352b9. Production PORT=8080 and PUBLIC_APP_URL=https://lot-trading-lab.vercel.app are configured. The original database and all existing private secrets remain unchanged.
 
 ## Validation and Acceptance
 
-Every route currently in `backend/urls.py` and `/api/engine` must be served by Java/C++, including private feed failures, recovery configuration failures, comparison reconstruction and revoked shares. Registered users retain credentials and data. Copied guest cookies cannot access registered accounts. Missing CSRF and cross-origin mutations fail. Retry keys do not double-debit or double-advance. Competing requests cannot overspend, oversell, overreserve or bypass replay revision checks. Existing replay state hashes reconstruct identically.
+`server/mvnw -B -s server/maven-settings.xml -f server/pom.xml verify` passes 20 tests and formatting. `python3 matching/verify.py` passes 144 executions plus input/book checks. `npm run build`, `npm run lint` and `npm test` pass, with ten frontend tests.
 
-After deployment `/api/health` identifies the Java service, the frontend completes ordinary buy/sell/resting cancellation and replay/decision inspection, and no Python/Go handler remains in the active deploy path. Build, runtime observations and residual limitations are recorded here and in migration documentation. A scaffold, Java-to-Django proxy, missing feature, failed migration or unavailable deployment does not satisfy completion.
+For a running local service, run `scripts/auth_smoke.py` and `scripts/replay_smoke.py` with http://127.0.0.1:8080. Install the development requirements into a Python 3.12 environment and run `scripts/java_compatibility.py` against that same local server with its DATABASE_URL exported. It refuses remote databases. Run `scripts/java_faults.py` to start a separate temporary Java service on 8082 and inject invalid, excessive, failed and timed-out execution. Every case must return 503 with the entire account unchanged. Python is a development oracle, not an application runtime.
+
+Run `java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true --server.port=0` for an offline audit. Against production, use `vercel env run --environment production -- .venv/bin/python scripts/java_reconcile.py`, setting LOT_JAVA to the JDK executable if needed. The wrapper enforces read-only connections and disables Flyway. Before/after migration, `scripts/database_snapshot.py capture` and `verify` use a private manifest path to prove original-record preservation without exporting record contents.
+
+The production health endpoint identifies Java/C++. Public auth and replay scripts passed after the alias switch. All three full replay days, account restoration, safe retries, GTC cancellation, sharing/revocation, notes, observed history and public synthetic feed isolation passed. HTML deep links return 200 and the polished MP4 returns 206 for byte ranges. Browser inspection shows the shared decision trunk and both branches with their original results. Complete evidence, counts and CI links are recorded in `docs/JAVA_MIGRATION_VERIFICATION.md`.
 
 ## Idempotence and Recovery
 
-Keep the current production deployment active until a preview is proven. Additive migrations can run repeatedly through Flyway. Never execute Flyway clean, reset accounts, rotate secrets or overwrite existing rows for convenience. Preserve the previous deployment as rollback; avoid new data formats that it cannot read. Record command/event representations compatible with the existing implementation during transition.
+Flyway startup migration can be repeated safely; clean is disabled. Original application rows were never rewritten. The original-row hash manifest remains private in `.tools/production-before-java.json` and verifies every originally captured account, credential, position, trade, ledger, snapshot, replay, event, session and throttle record after cutover.
+
+The prior deployment dpl_EAtHwPGbFnULjZADTrErKjWvx9F6 remains available at lot-trading-p84199729-dricmoys-projects.vercel.app. Roll back the public URL with `vercel alias set lot-trading-p84199729-dricmoys-projects.vercel.app lot-trading-lab.vercel.app`. Existing financial/replay formats remain compatible. Users holding new opaque Java sessions would sign in again on Django. Do not reset accounts, delete data, rotate keys or repair production checksums as a rollback shortcut.
 
 ## Surprises & Discoveries
 
-Legacy Django inherited its global America/Chicago timezone. Its reset-token timestamp counts naive local seconds since 2001; interpreting that timestamp as UTC rejected still-valid links by several hours. Java now uses the original timezone for the compatibility verifier, proven with a real Django-generated token accepted once by Java. New Java recovery uses absolute UTC expiry.
+The system Java command was a macOS stub and the global Maven settings used a corporate mirror. Existing Homebrew Java and project-scoped Maven Central settings solved both without global configuration changes. Local Docker was unhealthy; native PostgreSQL and Vercel's actual Linux container builder supplied independent runtime evidence.
 
-PostgreSQL now() is the transaction start time. Requests waiting on an account lock can otherwise write cash movements with timestamps preceding earlier commits. New ledger and replay writes use clock_timestamp() so reconstruction follows application order. Canonical ordinary fingerprints preserve Python's spaces and its treatment of whitespace-only notes; replay fingerprints preserve compact sorted ASCII JSON.
+Django inherited America/Chicago for its naive password-reset token clock. Treating that timestamp as UTC rejected still-valid links. Java now reproduces the legacy clock; real Django-created links pass once after migration. Java password limits also count Unicode characters rather than UTF-16 code units, preserving Django bounds.
 
+PostgreSQL now() records transaction start, which can precede lock acquisition. New ledger/event writes use clock_timestamp() so accepted mutations reconstruct in application order. Ordinary fingerprints retain Python's spaces and whitespace-note condition; replay fingerprints retain compact sorted ASCII JSON. Both are covered by fixtures and saved-data checks.
 
-The default `java` command is a macOS stub, but Homebrew already has OpenJDK 21.0.11. Maven is absent. The filesystem has about 14 GiB free, so use existing tools and bounded container caches. Vercel's container runtime is now documented; current account/CLI compatibility still needs direct deployment evidence.
+An initial schema preview created history in the preview namespace and two empty Java tables in public when the hosted pool lost search-path settings. Every original-record hash remained unchanged. A distinct empty preview database replaced schema isolation. The unpublished migration gained IF NOT EXISTS clauses; only the owned disposable local migration checksum was adjusted. No production checksum was edited.
+
+One deployment uploaded a source file while local formatting was still running and failed the formatting gate. A stable committed snapshot fixed it. Production then built the exact verified backend commit. Deployment source preparation and mutation are now kept sequential.
 
 ## Outcomes & Retrospective
 
-Local Java/C++ services run against a separate PostgreSQL 17 database. Maven verify passes 19 tests, including nine legacy replay scenario/friction cases with state after each action. The C++ protocol oracle passes 144 executions, four books and eleven rejected inputs. Existing HTTP auth and replay smoke scripts pass. The new local-only `scripts/java_compatibility.py` creates records through Django and proves existing sessions, Unicode PBKDF2 hashes, signed guests, cash/positions/watchlists, ordinary retry fingerprints, completed replay reconstruction, guest promotion, recovery tokens, session revocation and six concurrency patterns work through Java. Java's read-only reconciliation reports 23 accounts, nine orders, twelve replays and no problems after these checks.
+The complete API runs as Java/C++ on the public URL, with the frontend, no-signup demo, recorded video and decision trees intact. Twenty Java tests, ten frontend tests, the C++ oracle, local legacy/concurrency/fault checks, actual hosted provider checks and public HTTP/browser checks pass. CI passed both the deployed backend and the added failure checks.
 
-Production remains the old deployment. An original-row hash manifest for all eleven legacy data tables is saved locally with permissions 0600, without record contents. Production and preview environment URLs point at the same database; the initial container preview attempted a separate schema. Hosted transaction pooling lost session search-path settings, so that attempt did not isolate table creation as intended: Flyway history went into the preview schema and two empty Java-specific tables were added in public. A read-only before/after check proved all original records in all eleven legacy tables unchanged. The broken preview did not pass signup and must never be promoted. A separate empty database named `lot_java_preview_20261016` was then created on the same existing PostgreSQL cluster; its private URL is in the ignored `.tools/preview-database-url`. The current candidate overrides DATABASE_URL to that database and uses no schema overrides. Never promote a candidate with a preview database URL. A first preview with framework null built static assets only; it is not Java deployment evidence. Framework container is now explicit for the next attempt. Browser, actual container, provider and production checks remain required.
+All original rows in eleven tables remained unchanged. The final production Java audit returned 34 accounts, six orders, thirteen replays and no problems; extra workspaces belong to disposable verification. Existing SMTP remains unconfigured and recovery truthfully returns 503 in production until a sender is configured. The locally verified recovery implementation remains available. Ordinary matching remains a bounded stateless simulation with no claimed exchange throughput.
 
-Plan created October 16 after the explicit user goal to make the Java change happen; the earlier Java/C++ architecture choice remains in scope.
-
-Updated October 16 with local compatibility/concurrency evidence, the reset-token timezone correction, integrity capture and isolated container-preview steps. Deployment is still incomplete.
-
-
-October 16 deployment update: container framework must be explicit (`framework: container`); framework null produced only static assets. Container deployment dpl_ARYD2NoSHsyWFYq1Qg3YXzMX4QCi proved Java/C++ health, HTML deep links, in-memory comparison and MP4 byte-range delivery, but failed registered signup because schema settings do not survive hosted transaction pooling. The separate-database replacement is building as dpl_5oVbJQ6AbydZ6DdXi8fUmGgsSRN5, production environment with --skip-domain, the disposable DATABASE_URL override and opt-in LOT_VERIFY_PRIVATE=1. This gives the container existing server-only provider credentials for read-only verification without changing the live alias or real account database. The opt-in probe logs only counts/source/status and invokes no brokerage endpoints. Do not enable this diagnostic in the final production deployment.
-
-Production's original data has now been reconstructed and reconciled by the actual Java code with Flyway disabled and a PostgreSQL read-only repeatable-read snapshot: 25 accounts, four orders, seven saved replays, problems empty. The standalone audit wrapper supplies only a process-local ephemeral initialization key when the platform cannot export the real signing secret; it does not authenticate sessions, issue cookies or change any deployed key. An earlier audit with FOR UPDATE was rejected in read-only mode; the audit now uses snapshot reads, and the final read-only run passed.
-
-Local browser verification on the Java-served built frontend (port 8081) completed an ordinary simulated buy, created a replay, persisted a plan/order and advanced its clock with correct valuation. Run immutable copies of packaged jars when rebuilding locally: rewriting a running Spring Boot jar can break lazy class loading. Current immutable local runtime path is recorded in `.tools/current-runtime`. The owned local Flyway checksum was adjusted only for the unpublished V1 change adding IF NOT EXISTS around the new Java tables/indexes; no production checksum was edited. This makes startup safely accept the empty Java tables created by the failed preview attempt.
+Completed October 16, 2026. This revision replaces earlier in-progress notes with the deployed outcome, actual verification, pool-isolation correction and rollback procedure. No required migration work remains.

@@ -20,7 +20,7 @@ The demo records actual guest buy/sell trades, portfolio updates, and completed 
 
 ## Stack
 
-The Java/C++ migration is being verified; the public alias has not switched yet. See [migration progress](docs/JAVA_MIGRATION_EXECPLAN.md).
+**Java/C++ is live.** The original accounts and saved replays were preserved. See [migration verification](docs/JAVA_MIGRATION_VERIFICATION.md) and the [completed execution plan](docs/JAVA_MIGRATION_EXECPLAN.md).
 
 | Layer | Implementation |
 | --- | --- |
@@ -92,14 +92,15 @@ python3 scripts/replay_smoke.py http://127.0.0.1:8080
 java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true --server.port=0
 ```
 
-The Java suite covers deterministic replay parity against frozen legacy fixtures, canonical fingerprints, UUIDs, password hashes and signed cookies. The C++ oracle exercises 144 executions, four books and eleven invalid protocol inputs. HTTP checks exercise registration, trading, safe retries, ownership, replay, journal notes, sharing/revocation, reservations and observed history. Reconciliation checks cash movement chains, fills, reservations and replay reconstruction without changing records.
+The 20 Java tests cover deterministic replay parity against frozen legacy fixtures, canonical fingerprints, UUIDs, password hashes and signed cookies. The C++ oracle exercises 144 executions, four books and eleven invalid protocol inputs. HTTP checks exercise registration, trading, safe retries, ownership, replay, journal notes, sharing/revocation, reservations and observed history. Reconciliation checks cash movement chains, fills, reservations and replay reconstruction without changing records.
 
-The local-only migration harness also creates real Django records and verifies them through Java. It covers legacy sessions, Unicode passwords and notes, guest promotion, old/new one-use recovery links, session revocation, simultaneous duplicate orders, competing purchases/sales/reservations, and stale/duplicate replay actions. Python is used only by this development oracle, not by the deployed application:
+The local-only migration harness also creates real Django records and verifies them through Java. It covers legacy sessions, Unicode passwords and notes, guest promotion, old/new one-use recovery links, session revocation, simultaneous duplicate orders, competing purchases/sales/reservations, and stale/duplicate replay actions. A separate fault-injection check proves invalid, excessive, failed and timed-out execution leaves the account unchanged. Python is used only by this development oracle, not by the deployed application:
 
 ```sh
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/python scripts/java_compatibility.py http://127.0.0.1:8080
+.venv/bin/python scripts/java_faults.py
 .venv/bin/ruff check .
 ```
 

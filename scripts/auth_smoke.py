@@ -91,4 +91,4 @@ assert returning.request("/api/auth/password", {"current_password": password, "p
 assert returning.request("/api/auth/session")[1]["user"] is not None
 status, reset = returning.request("/api/reset", {})
 assert status == 200 and reset["cash"] == 10000000 and not reset["positions"] and not reset["orders"]
-print("PASS: registered account, CSRF, real market API, buy/sell cash and positions, safe retries, limits, insufficient cash/shares, logout, new-browser restoration, saved watchlist, identity isolation, password change, own-account reset")
+print("PASS: registered account, CSRF, HTTP market API, buy/sell cash and positions, safe retries, limits, insufficient cash/shares, logout, new-browser restoration, saved watchlist, identity isolation, password change, own-account reset")
