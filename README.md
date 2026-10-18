@@ -30,6 +30,42 @@ The demo records actual guest buy/sell trades, portfolio updates, and completed 
 | Persistence | PostgreSQL; the existing Neon schema is preserved |
 | Hosting | OCI container containing Spring Boot, C++ and the built React app |
 
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser["Browser · React + Redux"]
+    subgraph Runtime["Deployed OCI container"]
+        Assets["Static app + recorded demo"]
+        API["Spring Boot · Java 21<br/>Identity, accounts, orders, replay, history"]
+        CPP["C++20 executable<br/>Stateless price-level matching"]
+    end
+    DB[("PostgreSQL · Neon<br/>Accounts, ledger, sessions, replay events")]
+    Feed["Alpaca data API<br/>Owner-only quotes, bars, news"]
+    Mail["SMTP provider<br/>Optional recovery email"]
+    Browser -->|"Load app and video"| Assets
+    Browser -->|"JSON API · cookies + CSRF"| API
+    API -->|"JDBC transactions + row locks"| DB
+    API -->|"Bounded numeric stdin / JSON stdout"| CPP
+    API -->|"Server-side credentials"| Feed
+    API -->|"When configured"| Mail
+```
+
+Java owns identity, cash, reservations, persistence, and deterministic replay. C++ computes ordinary simulated executions against eight price levels per side; each invocation starts a fresh book and cannot access accounts or the database. Java validates its output before recording a fill. Replay uses its own Java model so saved events can reconstruct an attempt exactly. Public market data is synthetic; the private provider supplies data only, with no brokerage order routing.
+
+See the [architecture guide](docs/ARCHITECTURE.md) for transaction and replay diagrams, failure handling, data structures, and scaling tradeoffs. Python and Go remain development compatibility references outside the deployed runtime.
+
+### Project guide
+
+| Guide | What it explains |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Runtime boundaries, accounting, replay, and execution failures |
+| [Decision-tree comparison](docs/ATTEMPT_COMPARISON.md) | Shared choices, divergent branches, and comparable outcomes |
+| [Authentication](docs/AUTHENTICATION.md) | Guest promotion, sessions, and password recovery |
+| [Java/C++ migration evidence](docs/JAVA_MIGRATION_VERIFICATION.md) | Data preservation and compatibility checks |
+| [Replay verification](docs/REPLAY_VERIFICATION.md) | Scenarios, journals, reservations, sharing, and history |
+| [Recorded demo](docs/DEMO_FILM_QA.md) | Walkthrough footage, captions, and playback checks |
+
 ## What you can do
 
 - Replay a steady climb, sudden selloff, or volatile opening; only revealed prices and fictional dispatches reach the browser.
@@ -92,9 +128,9 @@ python3 scripts/replay_smoke.py http://127.0.0.1:8080
 java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true --server.port=0
 ```
 
-The 20 Java tests cover deterministic replay parity against frozen legacy fixtures, canonical fingerprints, UUIDs, password hashes and signed cookies. The C++ oracle exercises 144 executions, four books and eleven invalid protocol inputs. HTTP checks exercise registration, trading, safe retries, ownership, replay, journal notes, sharing/revocation, reservations and observed history. Reconciliation checks cash movement chains, fills, reservations and replay reconstruction without changing records.
+The Java tests cover deterministic replay parity against frozen legacy fixtures, canonical fingerprints, UUIDs, password hashes, signed cookies, and strict matcher response decoding. The C++ oracle exercises 144 executions, four books and eleven invalid protocol inputs. HTTP checks exercise registration, trading, safe retries, ownership, replay, journal notes, sharing/revocation, reservations and observed history. Reconciliation checks cash movement chains, fills, reservations and replay reconstruction without changing records.
 
-The local-only migration harness also creates real Django records and verifies them through Java. It covers legacy sessions, Unicode passwords and notes, guest promotion, old/new one-use recovery links, session revocation, simultaneous duplicate orders, competing purchases/sales/reservations, and stale/duplicate replay actions. A separate fault-injection check proves invalid, excessive, failed and timed-out execution leaves the account unchanged. Python is used only by this development oracle, not by the deployed application:
+The local-only migration harness also creates real Django records and verifies them through Java. It covers legacy sessions, Unicode passwords and notes, guest promotion, old/new one-use recovery links, session revocation, simultaneous duplicate orders, competing purchases/sales/reservations, and stale/duplicate replay actions. A separate fault-injection check covers nine execution failures: invalid fills, excessive quantities, malformed JSON, empty output, null, arrays, trailing JSON, nonzero exits, and timeouts. Each must return HTTP 503 with identical cash, positions, orders, and revision. Python is used only by this development oracle, not by the deployed application:
 
 ```sh
 uv venv --python 3.12 .venv
