@@ -16,8 +16,8 @@ jar = CookieJar()
 browser = build_opener(HTTPCookieProcessor(jar))
 
 
-def call(route, body=None):
-    headers = {"Origin": origin, "Content-Type": "application/json", "Idempotency-Key": str(uuid.uuid4()),
+def call(route, body=None, key=None):
+    headers = {"Origin": origin, "Content-Type": "application/json", "Idempotency-Key": key or str(uuid.uuid4()),
                "X-CSRFToken": next((c.value for c in jar if c.name == "csrftoken"), "")}
     request = Request(origin + route, data=json.dumps(body).encode() if body is not None else None, headers=headers)
     try:
@@ -37,6 +37,9 @@ with tempfile.TemporaryDirectory(prefix="lot-execution-faults-") as directory:
     binary.write_text("#!/bin/sh\ncase \"$(cat '" + str(mode) + "')\" in\n"
                       "invalid) printf '%s\\n' '{\"fills\":[{\"quantity\":1,\"price\":0}],\"quantity\":1,\"total\":0,\"status\":\"filled\"}';;\n"
                       "excess) printf '%s\\n' '{\"fills\":[{\"quantity\":10001,\"price\":100}],\"quantity\":10001,\"total\":1000100,\"status\":\"filled\"}';;\n"
+                      "malformed) printf '{';;\nempty) :;;\nnull) printf 'null';;\narray) printf '[]';;\n"
+                      "trailing) printf '%s\\n' '{\"fills\":[],\"quantity\":0,\"total\":0,\"status\":\"cancelled\"} {}';;\n"
+                      "recovered) printf '%s\\n' '{\"fills\":[{\"quantity\":1,\"price\":100}],\"quantity\":1,\"total\":100,\"status\":\"filled\"}';;\n"
                       "failure) exit 2;;\ntimeout) exec sleep 6;;\nesac\n")
     binary.chmod(0o700)
     environment = {**os.environ, "PORT": "8082", "PUBLIC_APP_URL": origin, "LOT_MATCHING_BINARY": str(binary)}
@@ -47,13 +50,23 @@ with tempfile.TemporaryDirectory(prefix="lot-execution-faults-") as directory:
             subprocess.run([os.sys.executable, "scripts/wait_for_http.py", origin + "/api/health"], check=True)
             code, before = call("/api/account")
             assert code == 200
-            for fault in ("invalid", "excess", "failure", "timeout"):
+            key = str(uuid.uuid4())
+            order = {"symbol": "AAPL", "side": "buy", "kind": "market", "quantity": 1}
+            for fault in ("invalid", "excess", "malformed", "empty", "null", "array", "trailing", "failure", "timeout"):
                 mode.write_text(fault)
-                code, result = call("/api/orders", {"symbol": "AAPL", "side": "buy", "kind": "market", "quantity": 1})
+                code, result = call("/api/orders", order, key)
                 assert code == 503, (fault, code, result)
                 code, after = call("/api/account")
                 assert code == 200 and before == after, fault
                 print(f"PASS: execution {fault} returns 503 with identical cash, positions, orders and revision")
+            mode.write_text("recovered")
+            code, accepted = call("/api/orders", order, key)
+            assert code == 201 and accepted["replayed"] is False, (code, accepted)
+            code, retried = call("/api/orders", order, key)
+            assert code == 200 and retried["replayed"] is True, (code, retried)
+            assert accepted["order"] == retried["order"] and accepted["account"] == retried["account"]
+            assert accepted["account"]["cash"] == before["cash"] - 100
+            print("PASS: the same failed key succeeds after recovery and retries without a second debit")
         finally:
             server.terminate()
             try:

@@ -1,5 +1,23 @@
 # Architecture and engineering discussion
 
+## Runtime overview
+
+The [README runtime diagram](../README.md#architecture) shows the deployed components. The browser loads the built React application and recorded demo from the same container that serves the Spring Boot API. API calls carry cookies and CSRF headers; the browser never receives database or market-provider credentials. PostgreSQL is the durable authority for identities, accounts, orders, ledger movements, replay sessions/events, and observed portfolio history.
+
+| Component | Responsibility | Source |
+| --- | --- | --- |
+| React / Redux | Trading workspace, replay controls, decision-tree comparison, demo playback | [`src/`](../src/) |
+| Spring request boundary | Origins, CSRF, body limits, API cache policy | [`SecurityConfig.java`](../server/src/main/java/com/lot/SecurityConfig.java) |
+| Account service | Row locks, reservations, idempotency, execution validation, ledger writes | [`Accounts.java`](../server/src/main/java/com/lot/Accounts.java) |
+| Execution adapter | Bounded subprocess lifetime and strict JSON decoding | [`MatchingEngine.java`](../server/src/main/java/com/lot/MatchingEngine.java) |
+| C++ engine | Ordered price levels and FIFO queues for each simulated book | [`matching/main.cpp`](../matching/main.cpp) |
+| Replay service / model | Session locking, event persistence, deterministic virtual fills | [`ReplayService.java`](../server/src/main/java/com/lot/ReplayService.java), [`ReplayEngine.java`](../server/src/main/java/com/lot/ReplayEngine.java) |
+| Market adapter | Synthetic prices or owner-only provider reads and caching | [`MarketData.java`](../server/src/main/java/com/lot/MarketData.java) |
+
+SMTP is optional: recovery email needs a configured provider; development writes messages to a local mailbox. The private Alpaca adapter reads quotes, bars, and headlines. Neither integration executes real-money orders. The C++ child receives numeric order terms and a reference price, with no credentials or database access. Python and Go are retained only as development compatibility references.
+
+## Ordinary order transaction
+
 ```mermaid
 sequenceDiagram
     participant UI as React / Redux
@@ -7,7 +25,7 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant CPP as C++ executable
     UI->>API: POST /api/orders + CSRF + idempotency key
-    API->>DB: BEGIN; SELECT account FOR UPDATE
+    API->>DB: BEGIN, SELECT account FOR UPDATE
     API->>DB: Check existing key + fingerprint
     alt identical retry
         API-->>UI: Original order, no second execution
@@ -17,7 +35,7 @@ sequenceDiagram
         CPP->>CPP: Consume ordered price levels and FIFO queues
         CPP-->>API: Fills, integer total, duration
         API->>API: Verify execution totals and buying power
-        API->>DB: Update cash/position; insert order + ledger
+        API->>DB: Update cash/position, insert order + ledger
         API->>DB: COMMIT
         API-->>UI: Updated account and execution details
     end
@@ -43,6 +61,14 @@ C++ indexes levels in an ordered map and consumes FIFO entries from the lowest a
 
 Java invokes the packaged executable with ProcessBuilder and a bounded numeric text protocol, without a shell. At most eight subprocesses run concurrently; capacity waiting has a two-second deadline and execution has a three-second deadline. Output is bounded and independently validated before cash changes. This deliberately preserves the existing stateless simulation. A persistent instrument engine and branching state remain future work, with no throughput claims from an eight-level toy book.
 
+### Execution failure contract
+
+The adapter reads at most 65,537 bytes and rejects output over 65,536 bytes. A successful process must return exactly one non-null JSON object. The C++ executable emits UTF-8; byte-oriented JSON decoding rejects malformed UTF-8 instead of replacing invalid bytes. Empty output, malformed JSON, non-object roots, trailing content, and decoding failures return a safe HTTP 503 response without parser internals. Account execution validation then checks each fill's integer quantity/price, totals, status, requested quantity, and limit price before any cash or position write.
+
+Unavailable binaries, nonzero exits, timeouts, and capacity exhaustion also return HTTP 503. The enclosing account transaction rolls back, including any provisional writes. The caller can retry the same idempotency key after the execution service recovers. A failed attempt does not consume the key as a successful order.
+
+[`MatchingEngineTest`](../server/src/test/java/com/lot/MatchingEngineTest.java) covers wire decoding, including invalid UTF-8. [`scripts/java_faults.py`](../scripts/java_faults.py) substitutes a test executable in a separate local Java process and verifies nine failure modes return 503 with an identical full account response. It then recovers the service, succeeds with the same request key, and retries without another debit. It refuses remote database hosts and runs in CI against disposable PostgreSQL.
+
 ## Scaling discussion
 
 For a real exchange-like simulator, partition an order book by instrument, enforce a single writer per partition, maintain price-level queues, and append a durable event log. For account services, replace network calls under database locks with explicit fund reservations and a transactional outbox. Consumers must be idempotent; describe delivery as at-least-once rather than promising distributed exactly-once processing. Measure contention, tail latency, memory per order and crash recovery before choosing more elaborate containers or concurrency mechanisms.
@@ -66,6 +92,30 @@ The current deployment is intentionally bounded: a personal portfolio demo packa
 Synchronized refreshes coalesce within each Java process. Quotes cache 30 seconds, selected bars 60 seconds. Failed refreshes return an error rather than synthetic data. Each provider request has a seven-second timeout; the account lock remains held during quote lookup and bounded matching. Historical chart timestamps identify the latest available regular session, with sparse bars preserved. See README for coverage and cache limitations.
 
 ## Replay and learning
+
+```mermaid
+sequenceDiagram
+    participant UI as Replay workspace
+    participant API as Java ReplayService
+    participant DB as PostgreSQL
+    participant Model as Java ReplayEngine
+    UI->>API: Action + revision + UUID key
+    API->>DB: BEGIN, lock owned replay session
+    API->>DB: Check key, payload fingerprint, revision
+    alt matching retry
+        API-->>UI: Current saved state, no repeated action
+    else conflicting key or stale revision
+        API-->>UI: HTTP 409, no accepted event
+    else new action
+        API->>Model: Apply action to observed virtual moment
+        Model-->>API: Deterministic state and modeled fills
+        API->>DB: Save state, accepted event, next revision
+        API->>DB: COMMIT
+        API-->>UI: Revealed prefix, orders, journal, recap
+    end
+```
+
+Replay executes entirely in Java. It does not spawn the ordinary C++ matcher or depend on the private market feed. Attempt comparison reconstructs recorded states from saved replay events; the decision tree describes observed actions rather than predicting unplayed market outcomes.
 
 ReplaySession holds an independent integer-cent cash/position state, versioned scenario identity, revision, and optional sharing token. ReplayEvent records each accepted action, payload fingerprint, UUID key, and revision. The catalog contains authored scenario descriptions; session responses contain only the observed price/news prefix. Session locking serializes mutations. Equal-key retries do not repeat an action, conflicting payloads and stale revisions return 409, and order IDs derive deterministically from session/request UUIDs for event reconstruction.
 

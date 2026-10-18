@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.*;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
 
 @Service
 final class MatchingEngine {
@@ -51,7 +53,7 @@ final class MatchingEngine {
       if (child.exitValue() != 0 || bytes.length > 65536)
         throw new ApiException(
             503, "The execution service rejected its input. No funds were changed.");
-      return parse(new String(bytes, StandardCharsets.UTF_8));
+      return decode(bytes);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new ApiException(503, "Execution was interrupted. Retry the same request.");
@@ -61,5 +63,19 @@ final class MatchingEngine {
       if (child != null && child.isAlive()) child.destroyForcibly();
       if (acquired) permits.release();
     }
+  }
+
+  static Map<String, Object> decode(byte[] bytes) {
+    try {
+      Map<String, Object> result =
+          MAPPER
+              .readerFor(Map.class)
+              .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+              .readValue(bytes);
+      if (result != null) return result;
+    } catch (JacksonException e) {
+      // The executable is a service boundary; parser details stay out of API responses.
+    }
+    throw new ApiException(503, "Execution data was invalid. No funds were changed.");
   }
 }
