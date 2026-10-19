@@ -61,6 +61,7 @@ See the [architecture guide](docs/ARCHITECTURE.md) for transaction and replay di
 | --- | --- |
 | [Architecture](docs/ARCHITECTURE.md) | Runtime boundaries, accounting, replay, and execution failures |
 | [Decision-tree comparison](docs/ATTEMPT_COMPARISON.md) | Shared choices, divergent branches, and comparable outcomes |
+| [Portfolio history](docs/PORTFOLIO_HISTORY.md) | Observed valuations, bounded charts, preserved extremes, and exact summaries |
 | [Authentication](docs/AUTHENTICATION.md) | Guest promotion, sessions, and password recovery |
 | [Java/C++ migration evidence](docs/JAVA_MIGRATION_VERIFICATION.md) | Data preservation and compatibility checks |
 | [Replay verification](docs/REPLAY_VERIFICATION.md) | Scenarios, journals, reservations, sharing, and history |
@@ -75,7 +76,7 @@ See the [architecture guide](docs/ARCHITECTURE.md) for transaction and replay di
 - Select light, standard, or challenging modeled spread, latency cost, and fees.
 - Explicitly share finished recaps; journal notes remain private by default, and links can be revoked.
 - Keep ordinary limit orders open with reserved cash/shares, cancel remainders, or choose immediate-or-cancel.
-- Track observed 1D/1W/1M portfolio values with an honest holding comparison and tracking start.
+- Track observed 1D/1W/1M portfolio values with a holding comparison, actual time spacing, and charts that preserve brief highs/lows and the largest drawdown.
 - Read attributed real headlines in the owner-only Alpaca workspace.
 - Open `/demo` immediately without signup; create an account later to save your progress.
 - Watch the recorded buy, sell, portfolio, and activity walkthrough on the landing page.
@@ -128,7 +129,7 @@ python3 scripts/replay_smoke.py http://127.0.0.1:8080
 java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true --server.port=0
 ```
 
-The Java tests cover deterministic replay parity against frozen legacy fixtures, canonical fingerprints, UUIDs, password hashes, signed cookies, and strict matcher response decoding. The C++ oracle exercises 144 executions, four books and eleven invalid protocol inputs. HTTP checks exercise registration, trading, safe retries, ownership, replay, journal notes, sharing/revocation, reservations and observed history. Reconciliation checks cash movement chains, fills, reservations and replay reconstruction without changing records.
+The Java tests cover deterministic replay parity against frozen legacy fixtures, canonical fingerprints, UUIDs, password hashes, signed cookies, strict matcher response decoding, and portfolio chart sampling. The C++ oracle exercises 144 executions, four books and eleven invalid protocol inputs. HTTP checks exercise registration, trading, safe retries, ownership, replay, journal notes, sharing/revocation, reservations and observed history. Reconciliation checks cash movement chains, fills, reservations and replay reconstruction without changing records.
 
 The local-only migration harness also creates real Django records and verifies them through Java. It covers legacy sessions, Unicode passwords and notes, guest promotion, old/new one-use recovery links, session revocation, simultaneous duplicate orders, competing purchases/sales/reservations, and stale/duplicate replay actions. A separate fault-injection check covers nine execution failures: invalid fills, excessive quantities, malformed JSON, empty output, null, arrays, trailing JSON, nonzero exits, and timeouts. Each must return HTTP 503 with identical cash, positions, orders, and revision. Python is used only by this development oracle, not by the deployed application:
 
@@ -137,10 +138,13 @@ uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/python scripts/java_compatibility.py http://127.0.0.1:8080
 .venv/bin/python scripts/java_faults.py
+.venv/bin/python scripts/history_sampling.py http://127.0.0.1:8080
 .venv/bin/ruff check .
 ```
 
 Use a disposable **local** database for this harness; it refuses remote hosts. GitHub Actions supplies an isolated PostgreSQL database and runs the Java/C++, frontend and HTTP checks. Local recovery messages are saved to the gitignored `.mailbox/` directory. Actual production email delivery still requires SMTP configuration; see [authentication](docs/AUTHENTICATION.md).
+
+The history check seeds only fresh disposable accounts. It exercises empty/small histories, the 240-point chart budget, brief portfolio and benchmark extremes, summary calculations, the 5,000-observation retention boundary, and account isolation. See the [history data flow and sampling contract](docs/PORTFOLIO_HISTORY.md).
 
 ## API
 
@@ -163,7 +167,7 @@ Use a disposable **local** database for this harness; it refuses remote hosts. G
 | `/api/orders/settle` | POST | Evaluate up to one eligible resting order, each at most once per 15-second bucket |
 | `/api/orders/cancel` | POST | Cancel owned remaining shares and release reservations |
 | `/api/orders/journal` | POST | Save an owned order reflection |
-| `/api/portfolio/history?days=7` | GET | Observed values and holding comparison; windows 1, 7, or 30 days |
+| `/api/portfolio/history?days=7` | GET | At most 240 original chart points and summaries from up to 5,000 observations; windows 1, 7, or 30 days |
 | `/api/replay` | GET/POST | Scenario catalog/saved sessions; start an independent replay |
 | `/api/replay/compare?first=<id>&second=<id>` | GET | Owned finished attempts, reconstructed decision branches and outcomes at a common clock |
 | `/api/replay/compare/example` | GET | Authored synthetic example executed entirely in memory; no saved user data |
