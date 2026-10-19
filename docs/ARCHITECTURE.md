@@ -13,6 +13,7 @@ The [README runtime diagram](../README.md#architecture) shows the deployed compo
 | C++ engine | Ordered price levels and FIFO queues for each simulated book | [`matching/main.cpp`](../matching/main.cpp) |
 | Replay service / model | Session locking, event persistence, deterministic virtual fills | [`ReplayService.java`](../server/src/main/java/com/lot/ReplayService.java), [`ReplayEngine.java`](../server/src/main/java/com/lot/ReplayEngine.java) |
 | Market adapter | Synthetic prices or owner-only provider reads and caching | [`MarketData.java`](../server/src/main/java/com/lot/MarketData.java) |
+| Portfolio history | Observed valuations, holding comparison, exact metrics, bounded extrema sampling | [`PortfolioHistory.java`](../server/src/main/java/com/lot/PortfolioHistory.java) |
 
 SMTP is optional: recovery email needs a configured provider; development writes messages to a local mailbox. The private Alpaca adapter reads quotes, bars, and headlines. Neither integration executes real-money orders. The C++ child receives numeric order terms and a reference price, with no credentials or database access. Python and Go are retained only as development compatibility references.
 
@@ -124,6 +125,8 @@ Synthetic spread, latency cost, fees, and shared per-side moment liquidity are e
 Shared recaps require a finished session and an explicit action. A random revocable token exposes sanitized outcomes without account identity or private session ID. Reasons/reflections are absent unless explicitly included. Guests retain progress in the signed browser workspace; existing guest promotion to a registered account preserves replay ownership.
 
 PortfolioSnapshot stores server-observed marks per account/history epoch/minute. Analytics begin at the first shown observation and compare unchanged initial quantities/cash at later observed prices. Reset rotates the epoch; earlier rows remain. No historical price path is invented. Account cash anchors plus original LedgerEntry and continuation OrderMovement rows support read-only reconciliation. Existing cash/order/ledger columns remain unchanged during additive migrations; the production helper compares their original column sets and row hashes.
+
+The history endpoint retains up to 5,000 observations in the selected window, calculates summaries from all retained rows, then selects at most 240 original chart points. Endpoints, both series' bucket extrema, and the portfolio maximum-drawdown pair remain visible. The browser uses numeric timestamps so selected and sparse observations retain their actual time spacing. The response's `observations` count describes the retained source rows; `limited` independently indicates that older rows were excluded by the 5,000-row cap. See the [portfolio history diagram and algorithm](PORTFOLIO_HISTORY.md).
 
 Production request logs contain route patterns, generated request IDs, method/status/duration; no bodies, cookies, account IDs, or query strings. Owner-only aggregate learning counters derive from persisted state. Automated verification sessions count as workspaces and must not be described as people or traction. GitHub Actions uses an isolated PostgreSQL 16 service for concurrency checks and runs frontend/Java/C++ and legacy-compatibility checks without production secrets.
 

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 final class PortfolioHistory {
+  private static final int CHART_POINTS = 240;
   final Database db;
 
   PortfolioHistory(Database db) {
@@ -63,6 +64,8 @@ final class PortfolioHistory {
             return obj(
                 "points",
                 List.of(),
+                "observations",
+                0,
                 "since",
                 null,
                 "return",
@@ -90,10 +93,7 @@ final class PortfolioHistory {
             drawdown = Math.max(drawdown, (peak - value) / (double) Math.max(1, peak) * 100);
             points.add(obj("time", row.get("bucket"), "value", value, "benchmark", benchmark));
           }
-          var shown = new ArrayList<Map<String, Object>>();
-          int stride = Math.max(1, points.size() / 240);
-          for (int index = 0; index < points.size(); index += stride) shown.add(points.get(index));
-          if (shown.getLast() != points.getLast()) shown.add(points.getLast());
+          var shown = sample(points);
           long count =
               db.count(
                   "SELECT count(*) FROM trading_portfoliosnapshot WHERE account_id=?::uuid AND epoch=?::uuid AND bucket>=?::timestamptz",
@@ -103,6 +103,8 @@ final class PortfolioHistory {
           return obj(
               "points",
               shown,
+              "observations",
+              rows.size(),
               "since",
               first.get("bucket"),
               "return",
@@ -116,5 +118,47 @@ final class PortfolioHistory {
               "definition",
               "Holding comparison keeps the cash and share quantities from the first shown observation; no earlier prices are reconstructed.");
         });
+  }
+
+  static List<Map<String, Object>> sample(List<Map<String, Object>> points) {
+    if (points.size() <= CHART_POINTS) return points;
+    var selected = new TreeSet<Integer>();
+    selected.add(0);
+    selected.add(points.size() - 1);
+
+    int peak = 0, drawdownPeak = 0, drawdownTrough = 0;
+    double drawdown = 0;
+    for (int index = 1; index < points.size(); index++) {
+      long value = n(points.get(index), "value");
+      if (value > n(points.get(peak), "value")) peak = index;
+      long high = n(points.get(peak), "value");
+      double loss = (high - value) / (double) Math.max(1, high);
+      if (loss > drawdown) {
+        drawdown = loss;
+        drawdownPeak = peak;
+        drawdownTrough = index;
+      }
+    }
+    selected.add(drawdownPeak);
+    selected.add(drawdownTrough);
+
+    // Reserve four slots for endpoints and the maximum-drawdown pair. Each
+    // bucket contributes at most four original points: two extrema per series.
+    int buckets = (CHART_POINTS - 4) / 4;
+    for (int bucket = 0; bucket < buckets; bucket++) {
+      int start = 1 + (points.size() - 2) * bucket / buckets;
+      int end = 1 + (points.size() - 2) * (bucket + 1) / buckets;
+      for (String series : List.of("value", "benchmark")) {
+        int low = start, high = start;
+        for (int index = start + 1; index < end; index++) {
+          long value = n(points.get(index), series);
+          if (value < n(points.get(low), series)) low = index;
+          if (value > n(points.get(high), series)) high = index;
+        }
+        selected.add(low);
+        selected.add(high);
+      }
+    }
+    return selected.stream().map(points::get).toList();
   }
 }

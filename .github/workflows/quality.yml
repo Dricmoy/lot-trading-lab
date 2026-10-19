@@ -59,6 +59,7 @@ jobs:
           python scripts/wait_for_http.py http://127.0.0.1:8080/api/health
       - run: python scripts/auth_smoke.py http://127.0.0.1:8080
       - run: python scripts/replay_smoke.py http://127.0.0.1:8080
+      - run: python scripts/history_sampling.py http://127.0.0.1:8080
       - run: python scripts/java_compatibility.py http://127.0.0.1:8080
       - run: python scripts/java_faults.py
       - run: java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true --server.port=0

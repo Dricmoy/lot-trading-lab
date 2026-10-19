@@ -20,6 +20,7 @@ import type { Order } from "./types";
 
 type History = {
   points: { time: string; value: number; benchmark: number }[];
+  observations: number;
   since: string | null;
   return: number;
   benchmark_return: number;
@@ -32,6 +33,20 @@ export function PortfolioHistory() {
   const [days, setDays] = useState(7);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
+  const chartPoints =
+    history?.points.map((point) => ({
+      ...point,
+      time: Date.parse(point.time),
+    })) ?? [];
+  const chartSpan = chartPoints.length
+    ? chartPoints[chartPoints.length - 1].time - chartPoints[0].time
+    : 0;
+  const tickTime = new Intl.DateTimeFormat(
+    undefined,
+    chartSpan >= 24 * 60 * 60 * 1000
+      ? { month: "short", day: "numeric" }
+      : { hour: "2-digit", minute: "2-digit" },
+  );
   useEffect(() => {
     const c = new AbortController();
     setError("");
@@ -109,17 +124,15 @@ export function PortfolioHistory() {
           </div>
           <div className="observed-history-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={history.points}>
+              <LineChart data={chartPoints}>
                 <CartesianGrid vertical={false} stroke="#e4eadd" />
                 <XAxis
                   dataKey="time"
+                  type="number"
+                  scale="time"
+                  domain={["dataMin", "dataMax"]}
                   minTickGap={60}
-                  tickFormatter={(t) =>
-                    new Date(t).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  }
+                  tickFormatter={(t) => tickTime.format(t)}
                   tick={{ fontSize: 11 }}
                 />
                 <YAxis
@@ -129,7 +142,7 @@ export function PortfolioHistory() {
                   tick={{ fontSize: 11 }}
                 />
                 <Tooltip
-                  labelFormatter={(t) => new Date(String(t)).toLocaleString()}
+                  labelFormatter={(t) => new Date(Number(t)).toLocaleString()}
                   formatter={(v, n) => [
                     money(Number(v)),
                     n === "value" ? "Portfolio" : "Holding comparison",
@@ -169,6 +182,8 @@ export function PortfolioHistory() {
             comparison holds the cash and share quantities at the first shown
             observation. One valuation is stored per observed minute; sparse
             observations are connected by straight lines.{" "}
+            {history.observations > history.points.length &&
+              `The chart keeps key observations; returns and drawdown use all ${history.observations.toLocaleString()} observations. `}
             {history.limited &&
               "This window shows the latest 5,000 observations."}{" "}
             A reset begins a new tracking period.
