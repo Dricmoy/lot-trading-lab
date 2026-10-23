@@ -29,6 +29,17 @@ import {
 } from "./store";
 import type { Account, User } from "./types";
 import { SharedReplay } from "./Replay";
+import {
+  HeroCopy,
+  HeroTitle,
+  HeroWorkspace,
+  LandingMotion,
+  LandingMotionControl,
+  LandingQuestion,
+  PreviewContent,
+  PreviewTabs,
+  ReplayIllustration,
+} from "./LandingMotion";
 
 type Session = { user: User | null; account: Account | null };
 type AuthMode = "signup" | "login" | "forgot-password" | "reset-password";
@@ -110,7 +121,7 @@ function Landing() {
   const sample = samples[stock];
   const start = user ? "/app" : "/demo";
   return (
-    <div className="landing">
+    <LandingMotion>
       <header className="site-nav">
         <Wordmark />
         <nav className={menu ? "open" : ""} aria-label="Website navigation">
@@ -146,8 +157,8 @@ function Landing() {
       </header>
       <main className="landing-main">
         <section className="landing-hero">
-          <div className="hero-copy">
-            <h1>Good investing starts with practice.</h1>
+          <HeroCopy>
+            <HeroTitle />
             <p>
               Try your ideas with $100,000 in virtual cash. Buy and sell stocks,
               build a portfolio, and get comfortable with every decision.
@@ -165,70 +176,63 @@ function Landing() {
             <span className="hero-fineprint">
               No signup. No deposits. Virtual money only.
             </span>
-          </div>
-          <div
-            className="hero-workspace"
-            aria-label="Interactive preview with illustrative prices"
-          >
-            <div className="preview-top">
-              <span>Practice account</span>
-              <span className="preview-balance">
-                $100,000.00 <small>Buying power</small>
-              </span>
-            </div>
+          </HeroCopy>
+          <HeroWorkspace symbol={stock}>
             <div
-              className="preview-tabs"
-              role="group"
-              aria-label="Preview stock"
+              className="hero-workspace"
+              aria-label="Interactive preview with illustrative prices"
             >
-              {Object.keys(samples).map((symbol) => (
-                <button
-                  key={symbol}
-                  aria-pressed={stock === symbol}
-                  className={stock === symbol ? "selected" : ""}
-                  onClick={() => setStock(symbol)}
-                >
-                  {symbol}
-                </button>
-              ))}
+              <div className="preview-top">
+                <span>Practice account</span>
+                <span className="preview-balance">
+                  $100,000.00 <small>Buying power</small>
+                </span>
+              </div>
+              <PreviewTabs
+                symbols={Object.keys(samples)}
+                selected={stock}
+                onSelect={setStock}
+              />
+              <PreviewContent symbol={stock}>
+                <div className="preview-quote">
+                  <span>{sample.name}</span>
+                  <strong>${sample.price}</strong>
+                  <span className="positive">
+                    {sample.gain}
+                    <small>Illustrative daily change</small>
+                  </span>
+                </div>
+                <div className="preview-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={sample.values.map((price) => ({ price }))}
+                      margin={{ top: 20, right: 0, bottom: 10, left: 0 }}
+                    >
+                      <CartesianGrid vertical={false} stroke="#dfe5d9" />
+                      <YAxis hide domain={["dataMin - 1", "dataMax + 1"]} />
+                      <Area
+                        type="monotone"
+                        dataKey="price"
+                        stroke="#215a3d"
+                        strokeWidth={2.5}
+                        fill="#e8f0db"
+                        isAnimationActive={false}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </PreviewContent>
+              <div className="preview-bottom">
+                <span>
+                  Illustrative prices <small>Virtual money only</small>
+                </span>
+                <Link href="/demo" className="button button-green">
+                  Try a trade
+                  <ArrowUpRight size={17} />
+                </Link>
+              </div>
             </div>
-            <div className="preview-quote">
-              <span>{sample.name}</span>
-              <strong>${sample.price}</strong>
-              <span className="positive">
-                {sample.gain}
-                <small>Illustrative daily change</small>
-              </span>
-            </div>
-            <div className="preview-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={sample.values.map((price) => ({ price }))}
-                  margin={{ top: 20, right: 0, bottom: 10, left: 0 }}
-                >
-                  <CartesianGrid vertical={false} stroke="#dfe5d9" />
-                  <YAxis hide domain={["dataMin - 1", "dataMax + 1"]} />
-                  <Area
-                    type="monotone"
-                    dataKey="price"
-                    stroke="#215a3d"
-                    strokeWidth={2.5}
-                    fill="#e8f0db"
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="preview-bottom">
-              <span>
-                Illustrative prices <small>Virtual money only</small>
-              </span>
-              <Link href="/demo" className="button button-green">
-                Try a trade
-                <ArrowUpRight size={17} />
-              </Link>
-            </div>
-          </div>
+          </HeroWorkspace>
         </section>
         <section
           className="walkthrough-section"
@@ -374,25 +378,7 @@ function Landing() {
           >
             <span>LOTX · Fictional market session</span>
             <div className="landing-replay-line">
-              <svg
-                viewBox="0 0 480 160"
-                role="img"
-                aria-label="An illustrative price line stops at the current moment, with the future hidden"
-              >
-                <path
-                  d="M0 120 L25 115 L48 124 L75 90 L95 98 L121 80 L147 85 L174 47 L196 62 L221 33 L248 40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                />
-                <circle cx="248" cy="40" r="5" fill="currentColor" />
-                <path
-                  d="M248 0 V160"
-                  stroke="currentColor"
-                  strokeDasharray="3 5"
-                  opacity=".4"
-                />
-              </svg>
+              <ReplayIllustration />
               <span>The rest is still ahead.</span>
             </div>
             <div className="landing-replay-steps">
@@ -510,50 +496,35 @@ function Landing() {
             to know.
           </h2>
           <div className="faq-list">
-            <details>
-              <summary>
-                Do I need an account to try it?<span>+</span>
-              </summary>
+            <LandingQuestion question="Do I need an account to try it?">
               <p>
                 No. Choose Try the demo to open the full workspace with a sample
                 portfolio. Your demo stays in this browser. Sign up later to
                 save it to an account and return from another device.
               </p>
-            </details>
-            <details>
-              <summary>
-                Am I investing real money?<span>+</span>
-              </summary>
+            </LandingQuestion>
+            <LandingQuestion question="Am I investing real money?">
               <p>
                 No. Your cash, stock prices, and trades in the public workspace
                 are simulated. You won't connect a bank account or make a
                 deposit.
               </p>
-            </details>
-            <details>
-              <summary>
-                Are the prices live?<span>+</span>
-              </summary>
+            </LandingQuestion>
+            <LandingQuestion question="Are the prices live?">
               <p>
                 The public workspace uses fictional prices and simulated
                 liquidity. It lets you practice the mechanics of placing orders,
                 rather than measure performance against today's market.
               </p>
-            </details>
-            <details>
-              <summary>
-                Can I keep my portfolio?<span>+</span>
-              </summary>
+            </LandingQuestion>
+            <LandingQuestion question="Can I keep my portfolio?">
               <p>
                 Yes. Create an account to save your holdings and history, then
                 sign in from another browser. If you start as a guest, signing
                 up saves that practice account.
               </p>
-            </details>
-            <details>
-              <summary>
-                How do limit orders work here?<span>+</span>
-              </summary>
+            </LandingQuestion>
+            <LandingQuestion question="How do limit orders work here?">
               <p>
                 Your limit sets the most you'll pay to buy or the least you'll
                 accept to sell. Keep the unfilled shares open and Lot checks
@@ -561,16 +532,13 @@ function Landing() {
                 can cancel an open remainder to release its reserved cash or
                 shares. Replay limits expire when the session ends.
               </p>
-            </details>
-            <details>
-              <summary>
-                Can I start over?<span>+</span>
-              </summary>
+            </LandingQuestion>
+            <LandingQuestion question="Can I start over?">
               <p>
                 Go to Portfolio and choose Reset practice account. It clears
                 your holdings and trades and restores $100,000 in virtual cash.
               </p>
-            </details>
+            </LandingQuestion>
           </div>
         </section>
         <section className="landing-final">
@@ -594,6 +562,7 @@ function Landing() {
           <Link href="/about">About Lot</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/login">Log in</Link>
+          <LandingMotionControl />
         </div>
         <p className="site-disclosure">
           Lot is a paper-trading simulator. Virtual funds, simulated prices and
@@ -601,7 +570,7 @@ function Landing() {
         </p>
         <span>© {new Date().getFullYear()} Lot</span>
       </footer>
-    </div>
+    </LandingMotion>
   );
 }
 
