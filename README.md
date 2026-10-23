@@ -18,15 +18,13 @@ Practice making trading decisions with virtual money. Choose a synthetic market 
 
 The demo records actual guest buy/sell trades, portfolio updates, and completed orders. It includes cursor zooms, transitions, captions, and a written transcript. GitHub displays the linked poster; the live landing plays the video with native controls.
 
-The landing page uses Motion for React (formerly Framer Motion) for a coordinated hero entrance, layered illustrative preview, responsive stock selection, a one-shot replay path, and smooth FAQ disclosure. It follows reduced-motion preferences, offers an Animations on/off control, and keeps the recorded walkthrough under manual playback control. See the [motion design and accessibility notes](docs/LANDING_MOTION.md).
-
 ## Stack
 
 **Java/C++ is live.** The original accounts and saved replays were preserved. See [migration verification](docs/JAVA_MIGRATION_VERIFICATION.md) and the [completed execution plan](docs/JAVA_MIGRATION_EXECPLAN.md).
 
 | Layer | Implementation |
 | --- | --- |
-| Client | React 19, TypeScript, Redux Toolkit, Vite, Recharts, Motion for React |
+| Client | React 19, TypeScript, Redux Toolkit, Vite, Recharts |
 | Account and replay API | Java 21, Spring Boot 4.1, Spring Security, JDBC, Flyway |
 | Matching engine | C++20, ordered price levels and FIFO queues |
 | Persistence | PostgreSQL; the existing Neon schema is preserved |
@@ -68,7 +66,6 @@ See the [architecture guide](docs/ARCHITECTURE.md) for transaction and replay di
 | [Java/C++ migration evidence](docs/JAVA_MIGRATION_VERIFICATION.md) | Data preservation and compatibility checks |
 | [Replay verification](docs/REPLAY_VERIFICATION.md) | Scenarios, journals, reservations, sharing, and history |
 | [Recorded demo](docs/DEMO_FILM_QA.md) | Walkthrough footage, captions, and playback checks |
-| [Landing motion](docs/LANDING_MOTION.md) | Choreography, reduced motion, keyboard behavior, and implementation boundaries |
 
 ## What you can do
 
