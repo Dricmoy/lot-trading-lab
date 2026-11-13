@@ -1,0 +1,27 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+JaCoCo Coverage Report,com.lot,ReplayService,721,560,56,34,81,70,42,20,8,9
+JaCoCo Coverage Report,com.lot,MarketData,700,453,63,7,123,44,38,12,5,10
+JaCoCo Coverage Report,com.lot,ApiException,0,7,0,0,0,3,0,1,0,1
+JaCoCo Coverage Report,com.lot,Identity,247,952,63,85,46,170,53,50,0,29
+JaCoCo Coverage Report,com.lot,MarketData.Chart,12,0,0,0,1,0,1,0,1,0
+JaCoCo Coverage Report,com.lot,ReplayService.Example,287,0,4,0,27,0,6,0,4,0
+JaCoCo Coverage Report,com.lot,Database,35,140,3,13,4,26,5,15,2,10
+JaCoCo Coverage Report,com.lot,Accounts.Reservations,0,9,0,0,0,1,0,1,0,1
+JaCoCo Coverage Report,com.lot,PrivateFeedProbe,127,12,1,1,17,4,2,2,1,2
+JaCoCo Coverage Report,com.lot,PortfolioHistory,9,740,5,35,1,100,5,21,0,6
+JaCoCo Coverage Report,com.lot,Accounts,598,1628,72,96,68,202,60,46,4,18
+JaCoCo Coverage Report,com.lot,TradingController,141,245,12,8,25,31,13,14,5,12
+JaCoCo Coverage Report,com.lot,Json,66,348,15,33,13,60,16,35,1,23
+JaCoCo Coverage Report,com.lot,Identity.Context,0,12,0,0,0,1,0,1,0,1
+JaCoCo Coverage Report,com.lot,AuthController,582,459,57,23,102,61,42,12,4,10
+JaCoCo Coverage Report,com.lot,SecurityConfig.1.new HttpServletRequestWrapper() {...},19,19,0,0,4,3,3,2,3,2
+JaCoCo Coverage Report,com.lot,LotApplication,27,93,9,7,2,21,8,2,0,2
+JaCoCo Coverage Report,com.lot,SecurityConfig,5,97,0,0,1,23,1,12,1,12
+JaCoCo Coverage Report,com.lot,MatchingEngine,22,190,4,12,6,50,4,9,0,5
+JaCoCo Coverage Report,com.lot,SpaController,2,3,0,0,1,1,1,1,1,1
+JaCoCo Coverage Report,com.lot,ReplayController,33,63,2,0,5,11,4,6,3,6
+JaCoCo Coverage Report,com.lot,Reconciliation,528,23,45,1,69,9,27,2,4,2
+JaCoCo Coverage Report,com.lot,ApiErrors,112,26,3,1,15,4,7,2,5,2
+JaCoCo Coverage Report,com.lot,ReplayEngine,742,1970,66,104,79,222,49,59,3,20
+JaCoCo Coverage Report,com.lot,SecurityConfig.1.1.new ServletInputStream() {...},16,19,2,0,3,3,4,3,3,3
+JaCoCo Coverage Report,com.lot,SecurityConfig.new OncePerRequestFilter() {...},133,99,21,13,25,27,17,3,1,2

@@ -1,0 +1,72 @@
+engine vus=1 duration=30s
+  requests 10679  rps 355.9  failed 0.00%
+  latency ms  p50 2.55  p95 3.68  p99 4.22  max 8.54
+  checks passed 100.00%
+engine vus=4 duration=30s
+  requests 40551  rps 1351.7  failed 0.00%
+  latency ms  p50 2.87  p95 3.21  p99 3.50  max 7.24
+  checks passed 100.00%
+engine vus=8 duration=30s
+  requests 73186  rps 2439.3  failed 0.00%
+  latency ms  p50 3.16  p95 3.61  p99 4.01  max 11.54
+  checks passed 100.00%
+engine vus=16 duration=30s
+  requests 78753  rps 2624.6  failed 0.00%
+  latency ms  p50 5.98  p95 6.95  p99 8.01  max 26.64
+  checks passed 100.00%
+engine vus=32 duration=30s
+  requests 77361  rps 2577.6  failed 0.00%
+  latency ms  p50 12.37  p95 14.27  p99 16.20  max 32.91
+  checks passed 100.00%
+engine vus=64 duration=30s
+  requests 77988  rps 2597.5  failed 0.00%
+  latency ms  p50 24.86  p95 27.91  p99 31.06  max 51.80
+  checks passed 100.00%
+orders vus=1 duration=30s
+  requests 4711  rps 157.0  failed 0.00%
+  latency ms  p50 6.22  p95 7.71  p99 8.54  max 16.89
+  checks passed 100.00%
+orders vus=4 duration=30s
+  requests 14600  rps 487.4  failed 0.00%
+  latency ms  p50 8.14  p95 11.10  p99 11.69  max 18.48
+  checks passed 100.00%
+orders vus=8 duration=30s
+  requests 20426  rps 680.6  failed 0.00%
+  latency ms  p50 10.65  p95 19.33  p99 20.27  max 27.73
+  checks passed 100.00%
+orders vus=16 duration=30s
+  requests 23006  rps 766.2  failed 0.00%
+  latency ms  p50 20.38  p95 32.70  p99 35.63  max 54.46
+  checks passed 100.00%
+orders vus=32 duration=30s
+  requests 26254  rps 873.8  failed 0.00%
+  latency ms  p50 32.19  p95 69.59  p99 93.31  max 150.39
+  checks passed 100.00%
+orders vus=64 duration=30s
+  requests 27235  rps 905.5  failed 0.00%
+  latency ms  p50 66.11  p95 141.12  p99 191.01  max 391.81
+  checks passed 100.00%
+account vus=1 duration=30s
+  requests 87247  rps 2908.2  failed 0.00%
+  latency ms  p50 0.31  p95 0.39  p99 0.56  max 8.43
+  checks passed 100.00%
+account vus=4 duration=30s
+  requests 288129  rps 9604.2  failed 0.00%
+  latency ms  p50 0.38  p95 0.49  p99 0.69  max 8.24
+  checks passed 100.00%
+account vus=8 duration=30s
+  requests 361651  rps 12054.8  failed 0.00%
+  latency ms  p50 0.62  p95 0.83  p99 1.21  max 8.26
+  checks passed 100.00%
+account vus=16 duration=30s
+  requests 358442  rps 11947.7  failed 0.00%
+  latency ms  p50 1.21  p95 2.48  p99 3.36  max 12.66
+  checks passed 100.00%
+account vus=32 duration=30s
+  requests 352406  rps 11745.9  failed 0.00%
+  latency ms  p50 2.44  p95 6.03  p99 8.57  max 31.44
+  checks passed 100.00%
+account vus=64 duration=30s
+  requests 352453  rps 11746.6  failed 0.00%
+  latency ms  p50 5.00  p95 12.92  p99 18.44  max 57.26
+  checks passed 100.00%

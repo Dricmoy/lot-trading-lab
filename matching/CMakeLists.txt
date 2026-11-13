@@ -4,3 +4,12 @@ add_executable(lot-matching main.cpp)
 target_compile_features(lot-matching PRIVATE cxx_std_20)
 target_compile_options(lot-matching PRIVATE -Wall -Wextra -Wpedantic -Werror)
 install(TARGETS lot-matching RUNTIME DESTINATION bin)
+
+# Optional microbenchmark: cmake -DLOT_BENCH=ON (needs Google Benchmark, e.g. brew install google-benchmark).
+option(LOT_BENCH "Build the matching microbenchmark" OFF)
+if(LOT_BENCH)
+  find_package(benchmark REQUIRED)
+  add_executable(lot-matching-bench bench.cpp)
+  target_compile_features(lot-matching-bench PRIVATE cxx_std_20)
+  target_link_libraries(lot-matching-bench PRIVATE benchmark::benchmark)
+endif()

@@ -2,6 +2,8 @@ package com.lot;
 
 import static com.lot.Json.*;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -12,6 +14,11 @@ import tools.jackson.databind.DeserializationFeature;
 @Service
 final class MatchingEngine {
   private final Semaphore permits = new Semaphore(8);
+  private final MeterRegistry metrics;
+
+  MatchingEngine(MeterRegistry metrics) {
+    this.metrics = metrics;
+  }
 
   Map<String, Object> book(long price) {
     return run("book " + price);
@@ -35,25 +42,41 @@ final class MatchingEngine {
     Process child = null;
     boolean acquired = false;
     try {
+      long waitStarted = System.nanoTime();
       acquired = permits.tryAcquire(2, TimeUnit.SECONDS);
+      metrics
+          .timer("lot.matching.permit.wait", "acquired", Boolean.toString(acquired))
+          .record(System.nanoTime() - waitStarted, TimeUnit.NANOSECONDS);
       if (!acquired)
         throw new ApiException(503, "The execution service is busy. Retry the same request.");
-      child =
-          new ProcessBuilder(Identity.env("LOT_MATCHING_BINARY", "matching/build/lot-matching"))
-              .redirectError(ProcessBuilder.Redirect.DISCARD)
-              .start();
-      try (var out = child.getOutputStream()) {
-        out.write((command + "\n").getBytes(StandardCharsets.US_ASCII));
+      Timer.Sample spawned = Timer.start(metrics);
+      String outcome = "error";
+      try {
+        child =
+            new ProcessBuilder(Identity.env("LOT_MATCHING_BINARY", "matching/build/lot-matching"))
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start();
+        try (var out = child.getOutputStream()) {
+          out.write((command + "\n").getBytes(StandardCharsets.US_ASCII));
+        }
+        if (!child.waitFor(3, TimeUnit.SECONDS)) {
+          child.destroyForcibly();
+          throw new ApiException(503, "Execution timed out. No funds were changed.");
+        }
+        byte[] bytes = child.getInputStream().readNBytes(65537);
+        if (child.exitValue() != 0 || bytes.length > 65536)
+          throw new ApiException(
+              503, "The execution service rejected its input. No funds were changed.");
+        var result = decode(bytes);
+        outcome = "ok";
+        return result;
+      } finally {
+        spawned.stop(
+            Timer.builder("lot.matching.subprocess")
+                .description("C++ matcher round trip: process start, stdin, wait, stdout decode")
+                .tag("outcome", outcome)
+                .register(metrics));
       }
-      if (!child.waitFor(3, TimeUnit.SECONDS)) {
-        child.destroyForcibly();
-        throw new ApiException(503, "Execution timed out. No funds were changed.");
-      }
-      byte[] bytes = child.getInputStream().readNBytes(65537);
-      if (child.exitValue() != 0 || bytes.length > 65536)
-        throw new ApiException(
-            503, "The execution service rejected its input. No funds were changed.");
-      return decode(bytes);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new ApiException(503, "Execution was interrupted. Retry the same request.");

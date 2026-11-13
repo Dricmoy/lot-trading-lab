@@ -33,7 +33,7 @@ Phone breakpoints were checked through the actual local app inside a 390 × 844 
 
 ## Measured matching sample
 
-`python scripts/benchmark.py`: warm local stateless Go synthetic matching, one excluded warm-up, 200 requests, concurrency 8, macOS 27.0.1 arm64.
+Historical (retired Go engine; see [BENCHMARKS.md](BENCHMARKS.md) for the current Java/C++ runtime). `python scripts/benchmark.py`: warm local stateless Go synthetic matching, one excluded warm-up, 200 requests, concurrency 8, macOS 27.0.1 arm64.
 
 | Measurement | Observed |
 | --- | --- |

@@ -1,0 +1,8 @@
+Post-load ledger audit (java -jar server/target/lot-server-2.0.0.jar --lot.reconcile=true), 2026-11-13.
+accounts=42296 orders=126343 replays=0
+Built-in audit: 52 "cash movement chain" flags in 4 accounts, all beginning 01:51:46.823 local.
+Root cause: the macOS wall clock stepped back 48 ms at that instant; the audit orders movements by
+created_at (clock_timestamp()), so 4 inserts sorted ahead of their predecessors.
+Independent check ordering trading_ledgerentry by its identity column: 0 broken links / 126,343 entries.
+Every account: cash == cash_anchor + sum(cash_delta); revision == order count (no lost updates).
+No "cash anchor reconciliation", reservation, position or order-total problems were reported.
