@@ -1,0 +1,27 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+Lot Java Backend,com.lot,ReplayService,1281,0,90,0,151,0,62,0,17,0
+Lot Java Backend,com.lot,MarketData,1153,0,70,0,167,0,50,0,15,0
+Lot Java Backend,com.lot,ApiException,0,7,0,0,0,3,0,1,0,1
+Lot Java Backend,com.lot,Identity,778,421,115,33,136,80,82,21,15,14
+Lot Java Backend,com.lot,MarketData.Chart,12,0,0,0,1,0,1,0,1,0
+Lot Java Backend,com.lot,ReplayService.Example,287,0,4,0,27,0,6,0,4,0
+Lot Java Backend,com.lot,Database,175,0,16,0,30,0,20,0,12,0
+Lot Java Backend,com.lot,Accounts.Reservations,9,0,0,0,1,0,1,0,1,0
+Lot Java Backend,com.lot,PrivateFeedProbe,139,0,2,0,21,0,4,0,3,0
+Lot Java Backend,com.lot,PortfolioHistory,547,202,22,18,70,31,16,10,5,1
+Lot Java Backend,com.lot,Accounts,2226,0,168,0,270,0,106,0,22,0
+Lot Java Backend,com.lot,TradingController,386,0,20,0,56,0,27,0,17,0
+Lot Java Backend,com.lot,Json,71,343,16,32,14,59,18,33,2,22
+Lot Java Backend,com.lot,Identity.Context,12,0,0,0,1,0,1,0,1,0
+Lot Java Backend,com.lot,AuthController,1041,0,80,0,163,0,54,0,14,0
+Lot Java Backend,com.lot,SecurityConfig.1.new HttpServletRequestWrapper() {...},38,0,0,0,7,0,5,0,5,0
+Lot Java Backend,com.lot,LotApplication,120,0,16,0,23,0,10,0,2,0
+Lot Java Backend,com.lot,SecurityConfig,102,0,0,0,24,0,13,0,13,0
+Lot Java Backend,com.lot,MatchingEngine,191,21,14,2,48,8,11,2,4,1
+Lot Java Backend,com.lot,SpaController,5,0,0,0,2,0,2,0,2,0
+Lot Java Backend,com.lot,ReplayController,96,0,2,0,16,0,10,0,9,0
+Lot Java Backend,com.lot,Reconciliation,551,0,46,0,78,0,29,0,6,0
+Lot Java Backend,com.lot,ApiErrors,138,0,4,0,19,0,9,0,7,0
+Lot Java Backend,com.lot,ReplayEngine,750,1962,70,100,79,222,53,55,3,20
+Lot Java Backend,com.lot,SecurityConfig.1.1.new ServletInputStream() {...},35,0,2,0,6,0,7,0,6,0
+Lot Java Backend,com.lot,SecurityConfig.new OncePerRequestFilter() {...},232,0,34,0,52,0,20,0,3,0

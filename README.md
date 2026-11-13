@@ -66,6 +66,7 @@ See the [architecture guide](docs/ARCHITECTURE.md) for transaction and replay di
 | [Java/C++ migration evidence](docs/JAVA_MIGRATION_VERIFICATION.md) | Data preservation and compatibility checks |
 | [Replay verification](docs/REPLAY_VERIFICATION.md) | Scenarios, journals, reservations, sharing, and history |
 | [Recorded demo](docs/DEMO_FILM_QA.md) | Walkthrough footage, captions, and playback checks |
+| [Benchmarks](docs/BENCHMARKS.md) | k6 load, C++ microbenchmark, post-load ledger audit, and coverage |
 
 ## What you can do
 

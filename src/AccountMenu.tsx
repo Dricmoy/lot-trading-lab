@@ -1,12 +1,20 @@
 import { useRef, useState } from "react";
-import { ChevronDown, Eye, EyeOff, LogOut, Settings, X } from "lucide-react";
+import {
+  ChevronDown,
+  Eye,
+  EyeOff,
+  LogOut,
+  Server,
+  Settings,
+  X,
+} from "lucide-react";
 import Dialog from "./Dialog";
 import { api } from "./lib";
 import { navigate } from "./navigation";
 import { clearSession, useAppDispatch, useAppSelector } from "./store";
 
 export default function AccountMenu() {
-  const { user } = useAppSelector((s) => s.trading);
+  const { user, account } = useAppSelector((s) => s.trading);
   const dispatch = useAppDispatch();
   const menu = useRef<HTMLDetailsElement>(null);
   const [settings, setSettings] = useState(false);
@@ -89,6 +97,16 @@ export default function AccountMenu() {
               </button>
               <button onClick={() => navigate("/login")}>Log in</button>
             </>
+          )}
+          {account?.legacy_url && (
+            <a
+              className="backend-switch"
+              href={account.legacy_url}
+              title="Open the same app on the pre-migration Django/Go backend (separate database)"
+            >
+              <Server size={16} />
+              Backend: Java/C++ · switch to Django/Go
+            </a>
           )}
           <button onClick={signout} disabled={pending}>
             <LogOut size={16} />

@@ -1,20 +1,12 @@
-#include <algorithm>
 #include <chrono>
 #include <cstdint>
-#include <deque>
 #include <iostream>
-#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
 
-struct Level { std::int64_t price, quantity; int sequence; };
-std::vector<Level> levels(std::int64_t price, bool asks) {
-    std::vector<Level> out;
-    out.reserve(8);
-    for (int i=0;i<8;++i) out.push_back({price+(asks?1:-1)*(i*3+1),asks?10+(i*23)%71:12+(i*17)%63,i});
-    return out;
-}
+#include "book.hpp"
+
 void print_levels(const std::vector<Level>& values) {
     std::cout << '[';
     bool comma=false;
@@ -39,19 +31,10 @@ int main() {
     if(mode=="match" && (quantity<1||quantity>10000||(side!="buy"&&side!="sell")||(kind!="market"&&kind!="limit")||(kind=="limit"&&(limit<1||limit>100000000))))return 2;
     const auto started=std::chrono::steady_clock::now();
     auto bids=levels(price,false),asks=levels(price,true);
-    std::map<std::int64_t,std::deque<Level>> index;
-    for(auto level:side=="buy"?asks:bids)index[level.price].push_back(level);
-    std::vector<Level> fills;
-    std::int64_t remaining=quantity,total=0;
-    while(mode=="match"&&!index.empty()&&remaining>0){
-        auto it=side=="buy"?index.begin():std::prev(index.end());
-        auto &fifo=it->second;
-        auto level=fifo.front();fifo.pop_front();
-        if(kind=="limit"&&((side=="buy"&&level.price>limit)||(side=="sell"&&level.price<limit)))break;
-        auto amount=std::min(remaining,level.quantity);
-        fills.push_back({level.price,amount,0});remaining-=amount;total+=amount*level.price;
-        if(fifo.empty())index.erase(it);
-    }
+    MatchResult matched{{},quantity,0};
+    if(mode=="match")matched=match(side=="buy"?asks:bids,side=="buy",kind=="limit",quantity,limit);
+    const auto& fills=matched.fills;
+    const auto remaining=matched.remaining,total=matched.total;
     if(mode=="match"){
         std::cout<<"{\"fills\":[";
         for(std::size_t i=0;i<fills.size();++i){if(i)std::cout<<',';std::cout<<"{\"price\":"<<fills[i].price<<",\"quantity\":"<<fills[i].quantity<<'}';}
