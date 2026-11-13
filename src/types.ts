@@ -49,6 +49,8 @@ export type Account = {
   cash: number;
   watchlist: string[];
   market_source?: string;
+  /** Present only for the owner when a legacy Django/Go deployment is configured. */
+  legacy_url?: string;
   positions: { symbol: string; quantity: number; cost: number }[];
   orders: Order[];
   revision?: number;

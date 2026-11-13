@@ -77,35 +77,40 @@ final class Accounts {
         () -> {
           var a = db.lockAccount(id);
           var r = reservations(id, null);
-          return obj(
-              "id",
-              id,
-              "revision",
-              a.get("revision"),
-              "cash",
-              a.get("cash"),
-              "watchlist",
-              a.get("watchlist"),
-              "market_source",
-              identity.isOwner(id) ? "alpaca-iex" : "simulated",
-              "positions",
-              db.rows(
-                  "SELECT symbol,quantity,cost FROM trading_position WHERE account_id=?::uuid AND quantity>0 ORDER BY id",
-                  id),
-              "orders",
-              db
-                  .rows(
-                      "SELECT * FROM trading_order WHERE account_id=?::uuid ORDER BY created_at DESC,id DESC LIMIT 50",
-                      id)
-                  .stream()
-                  .map(this::order)
-                  .toList(),
-              "open_orders",
-              open(id).stream().map(this::order).toList(),
-              "reserved_cash",
-              r.cash(),
-              "reserved_shares",
-              r.shares());
+          var out =
+              obj(
+                  "id",
+                  id,
+                  "revision",
+                  a.get("revision"),
+                  "cash",
+                  a.get("cash"),
+                  "watchlist",
+                  a.get("watchlist"),
+                  "market_source",
+                  identity.isOwner(id) ? "alpaca-iex" : "simulated",
+                  "positions",
+                  db.rows(
+                      "SELECT symbol,quantity,cost FROM trading_position WHERE account_id=?::uuid AND quantity>0 ORDER BY id",
+                      id),
+                  "orders",
+                  db
+                      .rows(
+                          "SELECT * FROM trading_order WHERE account_id=?::uuid ORDER BY created_at DESC,id DESC LIMIT 50",
+                          id)
+                      .stream()
+                      .map(this::order)
+                      .toList(),
+                  "open_orders",
+                  open(id).stream().map(this::order).toList(),
+                  "reserved_cash",
+                  r.cash(),
+                  "reserved_shares",
+                  r.shares());
+          // Owner-only backend switch; the legacy URL never reaches other accounts.
+          String legacy = Identity.env("LOT_LEGACY_URL", "");
+          if (identity.isOwner(id) && !legacy.isEmpty()) out.put("legacy_url", legacy);
+          return out;
         });
   }
 
